@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Registrar Nuevo Pedido</h2>
+<div class="alert alert-info">
+    El pedido se registrará bajo tu usuario actual: <strong>{{ session.nombre }}</strong>
+</div>
+
+<form action="/pedidos/nuevo" method="POST" class="mt-4 shadow p-4 rounded bg-light">
+    <div class="mb-3">
+        <label class="form-label">Seleccionar Cliente</label>
+        <select name="id_usuario" class="form-select" required>
+            <option value="" disabled selected>-- Elige un cliente --</option>
+            {% for cliente in clientes %}
+                <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Seleccionar Producto o Servicio</label>
+        <select name="id_producto" class="form-select" required>
+            <option value="" disabled selected>-- Elige un producto del catálogo --</option>
+            {% for producto in productos %}
+                <option value="{{ producto.id }}">{{ producto.nombre_producto }} - S/ {{ producto.precio }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Confirmar Pedido</button>
+    <a href="/pedidos" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

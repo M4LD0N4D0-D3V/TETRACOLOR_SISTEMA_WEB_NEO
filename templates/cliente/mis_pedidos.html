@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-light text-tetra-dark"><i class="bi bi-card-list text-success"></i> Mis Pedidos en Tetracolor</h2>
+        <span class="badge bg-dark fs-6 py-2">Cliente: {{ session.nombre }}</span>
+    </div>
+
+    <div class="row">
+        {% for pedido in pedidos %}
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title text-secondary mb-0 fw-light">Pedido #{{ pedido.id }}</h5>
+                        
+                        {% if pedido.estado == 'Pendiente' %}
+                            <span class="badge bg-warning text-dark py-2 px-3 rounded-pill shadow-sm"><i class="bi bi-box"></i> Pendiente</span>
+                        {% elif pedido.estado == 'En Proceso' %}
+                            <span class="badge bg-primary py-2 px-3 rounded-pill shadow-sm"><i class="bi bi-gear-fill"></i> En Proceso</span>
+                        {% elif pedido.estado == 'Completado' %}
+                            <span class="badge bg-success py-2 px-3 rounded-pill shadow-sm"><i class="bi bi-check-circle"></i> Completado</span>
+                        {% elif pedido.estado == 'Anulado' %}
+                            <span class="badge bg-danger py-2 px-3 rounded-pill shadow-sm"><i class="bi bi-x-circle"></i> Anulado</span>
+                        {% else %}
+                            <span class="badge bg-secondary py-2 px-3 rounded-pill shadow-sm">{{ pedido.estado }}</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="card-text text-dark">
+                        <strong>Producto:</strong> {{ pedido.producto if pedido.producto else pedido.nombre_producto }} <br>
+                        <strong>Descripción:</strong> {{ pedido.especificaciones }}
+                    </p>
+
+                    <div class="bg-light p-3 rounded-3 mb-3 border shadow-sm">
+                        <div class="row text-center border-bottom pb-2 mb-2">
+                            <div class="col-4 border-end">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;">Cantidad</small>
+                                <span class="fw-bold">{{ pedido.cantidad }} und.</span>
+                            </div>
+                            <div class="col-4 border-end">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;">Precio Unit.</small>
+                                <span class="fw-bold text-secondary">S/ {{ "%.2f"|format(pedido.precio_unitario) }}</span>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;">Total a Pagar</small>
+                                <span class="fw-bold text-dark fs-6">S/ {{ "%.2f"|format(pedido.total_pagado) }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="row text-center">
+                            <div class="col-6 border-end">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;">Abonado (A Cuenta)</small>
+                                <span class="fw-bold text-success">S/ {{ "%.2f"|format(pedido.adelanto) }}</span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size: 0.75rem;">Falta Pagar (Saldo)</small>
+                                {% set saldo = pedido.total_pagado - pedido.adelanto %}
+                                <span class="fw-bold {% if saldo > 0 %}text-danger{% else %}text-success{% endif %}">
+                                    S/ {{ "%.2f"|format(saldo) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-muted small mb-3 d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-calendar3"></i> {{ pedido.fecha.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                        {% if saldo <= 0 %}
+                            <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-all"></i> Pagado al 100%</span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger"><i class="bi bi-exclamation-circle"></i> Saldo Pendiente</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-3 border-top pt-3">
+                        {% set chat_ped = mensajes.get(pedido.id, []) %}
+                        
+                        <button class="btn btn-sm btn-outline-secondary w-100 rounded-pill position-relative" type="button" data-bs-toggle="collapse" data-bs-target="#chatPedido{{ pedido.id }}">
+                            <i class="bi bi-chat-left-text-fill text-success"></i> Ver Constatación e Historial 
+                            <span class="badge bg-secondary ms-1">{{ chat_ped|length }}</span>
+                            
+                            {% if chat_ped and (chat_ped|last).remitente_rol == 'administrador' %}
+                            <span class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle" style="margin-left: -15px;" title="¡Nuevo mensaje de soporte!">
+                                <span class="visually-hidden">Mensaje nuevo</span>
+                            </span>
+                            {% endif %}
+                        </button>
+                        
+                        <div class="collapse mt-2" id="chatPedido{{ pedido.id }}">
+                            <div class="card card-body bg-light border rounded-3 p-2" style="max-height: 250px; overflow-y: auto;">
+                                <small class="text-muted d-block text-center border-bottom pb-1 mb-2">Historial Oficial de Detalles</small>
+                                
+                                {% for msg in chat_ped %}
+                                    <div class="mb-2 p-2 rounded-3 {% if msg.remitente_rol == 'administrador' %}bg-white text-start shadow-sm me-4{% else %}bg-success text-white text-end ms-4 shadow-sm{% endif %}" style="font-size: 0.9rem;">
+                                        <strong class="d-block" style="font-size: 0.75rem;">
+                                            {% if msg.remitente_rol == 'administrador' %}🤖 Soporte Tetracolor{% else %}👤 Tú (Cliente){% endif %}
+                                        </strong>
+                                        
+                                        {% if msg.mensaje %}
+                                            <span class="d-block mb-1">{{ msg.mensaje }}</span>
+                                        {% endif %}
+                                        
+                                        {% if msg.archivo_adjunto %}
+                                            <div class="mt-2 mb-1">
+                                                <a href="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" target="_blank" class="d-inline-block border rounded overflow-hidden shadow-sm">
+                                                    <img src="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" alt="Adjunto" style="max-width: 150px; max-height: 150px; object-fit: cover;">
+                                                </a>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <small class="d-block {% if msg.remitente_rol == 'administrador' %}text-muted{% else %}text-white-50{% endif %}" style="font-size: 0.65rem;">{{ msg.fecha.strftime('%d/%m %H:%M') }}</small>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted text-center small my-3">Sin observaciones ni aclaraciones aún.</p>
+                                {% endfor %}
+                            </div>
+                            
+                            <form action="/pedido/{{ pedido.id }}/enviar_mensaje" method="POST" enctype="multipart/form-data" class="mt-2">
+                                <div class="input-group input-group-sm mb-1">
+                                    <input type="text" name="mensaje" class="form-control rounded-start-pill ps-3" placeholder="Añadir detalle o comprobante...">
+                                    
+                                    <input type="file" name="adjunto" id="adjuntoCliente{{ pedido.id }}" class="d-none" accept="image/*,.pdf">
+                                    <label for="adjuntoCliente{{ pedido.id }}" class="btn btn-outline-secondary bg-white text-dark" title="Adjuntar comprobante de pago">
+                                        <i class="bi bi-paperclip"></i>
+                                    </label>
+                                    
+                                    <button class="btn btn-success rounded-end-pill" type="submit"><i class="bi bi-send"></i></button>
+                                </div>
+                                <div class="text-end px-2">
+                                    <small id="nombreArchivo{{ pedido.id }}" class="text-muted" style="font-size: 0.7rem;"></small>
+                                </div>
+                                
+                                <script>
+                                    document.getElementById('adjuntoCliente{{ pedido.id }}').addEventListener('change', function(e) {
+                                        var fileName = e.target.files[0] ? e.target.files[0].name : '';
+                                        document.getElementById('nombreArchivo{{ pedido.id }}').textContent = fileName ? '📎 ' + fileName : '';
+                                    });
+                                </script>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center rounded-4 py-4" style="background-color: #d1f4f9; border:none; color: #055160;">
+                <i class="bi bi-emoji-neutral fs-2 d-block mb-2"></i>
+                Aún no has realizado ningún pedido. ¡Anímate a realizar tu primera impresión!
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

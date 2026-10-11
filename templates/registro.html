@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow mt-4">
+            <div class="card-header bg-success text-white text-center">
+                <h4>Crea tu cuenta</h4>
+            </div>
+            <div class="card-body p-4">
+                <form action="/registro" method="POST" id="formRegistro">
+                    
+                    <!-- Incluye el selector de tipo_doc y el input de documento -->
+                    {% include 'consulta_api.html' %}
+
+                    <!-- Campos para Persona Natural (DNI, CE, Pasaporte, Otro) -->
+                    <div id="campos_dni">
+                        <div class="mb-3">
+                            <label class="fw-bold text-secondary">Nombres</label>
+                            <input type="text" name="nombres" id="nombres" class="form-control bg-light" required readonly>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <label class="fw-bold text-secondary">A. Paterno</label>
+                                <input type="text" name="apellido_paterno" id="apellido_paterno" class="form-control bg-light" required readonly>
+                            </div>
+                            <div class="col-6">
+                                <label class="fw-bold text-secondary">A. Materno</label>
+                                <input type="text" name="apellido_materno" id="apellido_materno" class="form-control bg-light" required readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos para Empresa (RUC) -->
+                    <div id="campos_ruc" style="display: none;">
+                        <div class="mb-3">
+                            <label class="fw-bold text-secondary">Razón Social</label>
+                            <input type="text" name="razon_social" id="razon_social" class="form-control bg-light" readonly>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+
+                    <div class="mb-3">
+                        <label class="fw-bold text-secondary">Correo Electrónico</label>
+                        <input type="email" name="correo" class="form-control" placeholder="ejemplo@correo.com" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="telefono" class="fw-bold text-secondary">Teléfono / Celular</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">+51</span>
+                            <input type="tel" class="form-control" id="telefono" name="telefono" placeholder="999 888 777" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="domicilio">Domicilio / Dirección completa</label>
+                        <input type="text" class="form-control" id="domicilio" name="domicilio" placeholder="Ej. Av. Los Pinos 123, Distrito" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="fw-bold text-secondary">Contraseña</label>
+                        <input type="password" name="clave" class="form-control" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold">Registrarme</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lógica JavaScript para controlar dinámica de campos según tipo de documento -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Buscamos el selector que está dentro de 'consulta_api.html'
+    const selectTipoDoc = document.getElementById('tipo_doc') || document.querySelector('select[name="tipo_doc"]');
+    
+    if (selectTipoDoc) {
+        selectTipoDoc.addEventListener('change', actualizarFormulario);
+        actualizarFormulario(); // Ejecución inicial
+    }
+
+    function actualizarFormulario() {
+        const valorTipo = selectTipoDoc ? selectTipoDoc.value.toLowerCase() : 'dni';
+        
+        const divDni = document.getElementById('campos_dni');
+        const divRuc = document.getElementById('campos_ruc');
+        const inputsDni = divDni.querySelectorAll('input');
+        const inputRuc = document.getElementById('razon_social');
+
+        if (valorTipo === 'ruc') {
+            // Caso RUC: Muestra Razón Social y deshabilita requeridos de DNI
+            divDni.style.display = 'none';
+            divRuc.style.display = 'block';
+            
+            inputsDni.forEach(i => i.removeAttribute('required'));
+            if (inputRuc) inputRuc.setAttribute('required', 'required');
+
+        } else {
+            // Caso Persona Natural (DNI, CE, Pasaporte, Otro)
+            divDni.style.display = 'block';
+            divRuc.style.display = 'none';
+            
+            inputsDni.forEach(i => i.setAttribute('required', 'required'));
+            if (inputRuc) inputRuc.removeAttribute('required');
+
+            // Si es un documento internacional/manual, quitamos 'readonly' para que puedan escribir
+            const esManual = (valorTipo === 'ce' || valorTipo === 'pasaporte' || valorTipo === 'otro');
+            inputsDni.forEach(i => {
+                if (esManual) {
+                    i.removeAttribute('readonly');
+                    i.classList.remove('bg-light');
+                } else {
+                    // Si es DNI vuelve a ser readonly (llenado automático por la API)
+                    i.setAttribute('readonly', 'readonly');
+                    i.classList.add('bg-light');
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

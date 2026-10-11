@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Registrar Nuevo Cliente</h2>
+<form action="/clientes/guardar" method="POST" class="mt-4 shadow p-4 rounded bg-light">
+    <div class="mb-3">
+        <label class="form-label">Nombre o Razón Social</label>
+        <input type="text" name="nombre" class="form-control" required placeholder="Ej: Confecciones Textiles SAC">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Correo Electrónico</label>
+        <input type="email" name="correo" class="form-control" required placeholder="ventas@empresa.com">
+    </div>
+    <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+    <a href="/clientes" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

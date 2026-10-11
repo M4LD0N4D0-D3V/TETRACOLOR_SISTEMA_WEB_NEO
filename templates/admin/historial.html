@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Historial de: <span class="text-primary">{{ cliente }}</span></h2>
+        <a href="/pedidos" class="btn btn-outline-secondary">Regresar al Panel</a>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-body p-0">
+            <table class="table table-striped mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Producto</th>
+                        <th>Cant.</th>
+                        <th>Especificaciones del Material</th>
+                        <th>Estado Final</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in pedidos %}
+                    <tr>
+                        <td>{{ p.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="fw-bold">{{ p.nombre_producto }}</td>
+                        <td>{{ p.cantidad }}</td>
+                        <td><small class="text-muted">{{ p.especificaciones }}</small></td>
+                        <td>
+                            <span class="badge {% if p.estado == 'Anulado' %}bg-danger{% else %}bg-dark{% endif %}">
+                                {{ p.estado }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

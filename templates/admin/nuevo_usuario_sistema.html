@@ -1,0 +1,52 @@
+{% extends 'admin_base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-dark text-white">
+            <h4 class="mb-0">Registrar Nuevo Usuario del Sistema (Personal)</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin_nuevo_usuario_sistema') }}">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="nombre_completo">Nombre Completo</label>
+                        <input type="text" class="form-control" name="nombre_completo" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="correo">Correo Electrónico (Usuario)</label>
+                        <input type="email" class="form-control" name="correo" required>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="password">Contraseña Provisional</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="rol">Rol en el Sistema</label>
+                        <select class="form-control" name="rol" required>
+                            <option value="">Seleccione un rol...</option>
+                            <option value="Administrador">Administrador</option>
+                            <option value="Vendedor">Vendedor</option>
+                            <option value="Diseñador">Diseñador</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="estado">Estado de la cuenta</label>
+                        <select class="form-control" name="estado" required>
+                            <option value="Activo">Activo</option>
+                            <option value="Inactivo">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Registrar Empleado</button>
+                    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

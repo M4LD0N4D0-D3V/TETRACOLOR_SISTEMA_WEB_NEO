@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow border-danger mt-4">
+            <div class="card-header bg-danger text-white text-center">
+                <h4>Acceso Administrativo</h4>
+            </div>
+            <div class="card-body p-4">
+                <form action="/admin/login" method="POST">
+                    <div class="mb-3">
+                        <label>Correo Corporativo</label>
+                        <input type="email" name="correo" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Contraseña</label>
+                        <input type="password" name="clave" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100">Ingresar al Panel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow mt-4">
+            <div class="card-header bg-dark text-white text-center">
+                <h4>Iniciar Sesión</h4>
+            </div>
+            <div class="card-body p-4">
+                <form action="/login" method="POST">
+                    <div class="mb-3">
+                        <label>Correo Electrónico</label>
+                        <input type="email" name="correo" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Contraseña</label>
+                        <input type="password" name="clave" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+                </form>
+                <div class="text-center mt-3">
+                    <a href="/admin/login" class="text-muted small">¿Eres parte del equipo? Ingresa aquí.</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

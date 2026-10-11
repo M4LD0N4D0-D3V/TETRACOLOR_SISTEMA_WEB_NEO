@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <h1>Acerca de Tetracolor</h1>
+            <p class="lead">Somos líderes en soluciones de impresión y diseño gráfico.</p>
+            <p>En Tetracolor, nos especializamos en transformar tus ideas en productos visuales de alta calidad. Con años de experiencia en el mercado, ofrecemos servicios de gigantografías, viniles, material publicitario y merchandising.</p>
+            <p><strong>Nuestra Misión:</strong> Brindar resultados vibrantes y precisos que potencien la marca de nuestros clientes, garantizando tiempos de entrega eficientes y atención personalizada.</p>
+        </div>
+        <div class="col-md-6">
+            <!-- Reemplaza con una imagen real de tu local o logo -->
+            <img src="{{ url_for('static', filename='img/tetracolor_fachada.jpg') }}" class="img-fluid rounded shadow" alt="Instalaciones Tetracolor">
+        </div>
+    </div>
+</div>
+{% endblock %}

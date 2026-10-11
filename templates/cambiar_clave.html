@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Cambiar Contraseña - Tetracolor{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow mt-4">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">Cambiar Contraseña</h4>
+            </div>
+            <div class="card-body p-4">
+                <form action="/cambiar_clave" method="POST">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Nueva Contraseña</label>
+                        <div class="input-group">
+                            <input type="password" name="nueva" id="nueva" class="form-control" required placeholder="Ingresa tu nueva contraseña">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="nueva">
+                                Mostrar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Confirmar Contraseña</label>
+                        <div class="input-group">
+                            <input type="password" name="confirmacion" id="confirmacion" class="form-control" required placeholder="Repite la contraseña">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="confirmacion">
+                                Mostrar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="/pedidos" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Actualizar Contraseña</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Seleccionamos todos los botones que tengan la clase 'toggle-password'
+        const toggleButtons = document.querySelectorAll('.toggle-password');
+
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Obtenemos el ID del input asociado desde el atributo data-target
+                const targetId = this.getAttribute('data-target');
+                const inputElement = document.getElementById(targetId);
+
+                // Alternamos el tipo de input y el texto del botón
+                if (inputElement.type === 'password') {
+                    inputElement.type = 'text';
+                    this.textContent = 'Ocultar';
+                } else {
+                    inputElement.type = 'password';
+                    this.textContent = 'Mostrar';
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

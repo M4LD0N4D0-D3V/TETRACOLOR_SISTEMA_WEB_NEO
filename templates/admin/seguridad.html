@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow border-0">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h4><i class="bi bi-shield-lock-fill text-warning"></i> Centro de Monitoreo de Seguridad - Tetracolor</h4>
+            <span class="badge bg-danger">Filtro: Intentos Activos</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Desde este panel puedes supervisar qué direcciones IP están cometiendo errores de login y qué cuentas específicas están bajo intento de acceso.</p>
+            
+            {% if not reportes %}
+                <div class="alert alert-success text-center mb-0">
+                    <i class="bi bi-shield-check fs-4"></i> El sistema está seguro. No hay IPs con intentos fallidos registrados actualmente.
+                </div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Dirección IP</th>
+                                <th>Última Cuenta Intentada</th>
+                                <th class="text-center">N° Intentos</th>
+                                <th>Estado Actual</th>
+                                <th>Última Actividad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in reportes %}
+                            <tr>
+                                <td><code>{{ log.ip }}</code></td>
+                                <td>
+                                    <span class="text-primary fw-bold">{{ log.correo_intentado if log.correo_intentado else 'No especificado' }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge {{ 'bg-danger' if log.intentos >= 5 else 'bg-warning text-dark' }} fs-6">
+                                        {{ log.intentos }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if log.bloqueado_hasta and log.bloqueado_hasta > datetime_now %}
+                                        <span class="badge bg-danger p-2"><i class="bi bi-slash-circle"></i> BLOQUEADO</span>
+                                        <small class="text-danger d-block">Hasta: {{ log.bloqueado_hasta.strftime('%H:%M:%S') }}</small>
+                                    {% else %}
+                                        <span class="badge bg-success p-2"><i class="bi bi-check-circle"></i> Activo / Libre</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">{{ log.ultima_actividad }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

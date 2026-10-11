@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Directorio de Clientes</h2>
+    <a href="/admin/nuevo_cliente" class="btn btn-success">Nuevo Cliente</a>
+</div>
+
+<table class="table table-striped table-bordered align-middle">
+    <thead class="table-dark">
+        <tr>
+            <th>ID</th>
+            <th>Razón Social / Nombre</th>
+            <th>Correo de Contacto</th>
+            <th>Estado</th>
+            <th class="text-center">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cliente in clientes %}
+        <tr class="{% if cliente.estado == 'Inhabilitado' or cliente.activo == 0 %}table-light text-muted{% endif %}">
+            <td>{{ cliente.id }}</td>
+            <td>
+                {% if cliente.estado == 'Inhabilitado' or cliente.activo == 0 %}
+                    <del>{{ cliente.nombre }}</del>
+                {% else %}
+                    <strong>{{ cliente.nombre }}</strong>
+                {% endif %}
+            </td>
+            <td>{{ cliente.correo }}</td>
+            <td>
+                {% if cliente.estado == 'Inhabilitado' or cliente.activo == 0 %}
+                    <span class="badge bg-danger rounded-pill">Inactivo</span>
+                {% else %}
+                    <span class="badge bg-success rounded-pill">Activo</span>
+                {% endif %}
+            </td>
+            <td class="text-center">
+                {% if cliente.estado == 'Inhabilitado' or cliente.activo == 0 %}
+                    <a href="/clientes/cambiar_estado/{{ cliente.id }}/Habilitado" class="btn btn-success btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
+                        <i class="bi bi-check-circle"></i> Habilitar
+                    </a>
+                {% else %}
+                    <a href="/clientes/cambiar_estado/{{ cliente.id }}/Inhabilitado" class="btn btn-danger btn-sm d-inline-flex align-items-center gap-1 shadow-sm" onclick="return confirm('¿Estás seguro de INHABILITAR a este cliente? No podrá iniciar sesión ni realizar pedidos, pero se conservará su historial.');">
+                        <i class="bi bi-dash-circle"></i> Inhabilitar
+                    </a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

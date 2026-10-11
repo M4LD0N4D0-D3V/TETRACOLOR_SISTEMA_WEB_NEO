@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            <div class="card shadow-lg border-0 rounded-4">
+
+                <!-- HEADER -->
+                <div class="card-header bg-tetra-dark text-white p-4">
+                    <h4 class="mb-0">
+                        <i class="bi bi-person-plus-fill me-2"></i>
+                        Registro de Cliente Presencial
+                    </h4>
+                    <p class="small opacity-75 mb-0">
+                        Rellena los datos para crear la cuenta del cliente en el sistema.
+                    </p>
+                </div>
+
+                <!-- BODY -->
+                <div class="card-body p-4">
+
+                    <form action="/registro_presencial" method="POST" id="formNuevoCliente">
+
+                        <!-- API DE CONSULTA Y TIPO DOCUMENTO -->
+                        {% include 'consulta_api.html' %}
+
+                        <!-- CAMPOS PERSONA NATURAL (DNI, CE, PASAPORTE, OTRO) -->
+                        <div id="campos_dni">
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Nombres</label>
+                                <input
+                                    type="text"
+                                    name="nombres"
+                                    id="nombres"
+                                    class="form-control bg-light"
+                                    required
+                                    readonly
+                                >
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">A. Paterno</label>
+                                    <input
+                                        type="text"
+                                        name="apellido_paterno"
+                                        id="apellido_paterno"
+                                        class="form-control bg-light"
+                                        required
+                                        readonly
+                                    >
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">A. Materno</label>
+                                    <input
+                                        type="text"
+                                        name="apellido_materno"
+                                        id="apellido_materno"
+                                        class="form-control bg-light"
+                                        required
+                                        readonly
+                                    >
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- CAMPOS EMPRESA (RUC) -->
+                        <div id="campos_ruc" style="display:none;">
+
+                            <div class="mb-3 mt-3">
+                                <label class="form-label fw-bold">Razón Social</label>
+                                <input
+                                    type="text"
+                                    name="razon_social"
+                                    id="razon_social"
+                                    class="form-control bg-light"
+                                    readonly
+                                >
+                            </div>
+
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- CORREO -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Correo Electrónico</label>
+                            <input
+                                type="email"
+                                name="correo"
+                                class="form-control"
+                                placeholder="cliente@correo.com"
+                                required
+                            >
+                            <div class="form-text">
+                                Se usará para enviar sus comprobantes.
+                            </div>
+                        </div>
+
+                        <!-- TELEFONO -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Teléfono / Celular</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">+51</span>
+                                <input
+                                    type="tel"
+                                    class="form-control"
+                                    id="telefono"
+                                    name="telefono"
+                                    placeholder="999 888 777"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <!-- CONTRASEÑA OPCIONAL -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Contraseña (Opcional)</label>
+                            <input
+                                type="password"
+                                name="clave"
+                                class="form-control"
+                                placeholder="Opcional para registro presencial"
+                            >
+                        </div>
+
+                        <!-- BOTONES -->
+                        <div class="d-flex justify-content-between">
+                            <a href="/clientes" class="btn btn-light">Cancelar</a>
+                            <button type="submit" class="btn btn-tetra-green px-5">
+                                Guardar Cliente
+                            </button>
+                        </div>
+
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- LÓGICA JAVASCRIPT PARA REGISTRO PRESENCIAL -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectTipoDoc = document.getElementById('tipo_doc') || document.querySelector('select[name="tipo_doc"]');
+    
+    if (selectTipoDoc) {
+        selectTipoDoc.addEventListener('change', actualizarFormularioPresencial);
+        actualizarFormularioPresencial(); // Ejecución inicial al cargar la página
+    }
+
+    function actualizarFormularioPresencial() {
+        const valorTipo = selectTipoDoc ? selectTipoDoc.value.toLowerCase() : 'dni';
+        
+        const divDni = document.getElementById('campos_dni');
+        const divRuc = document.getElementById('campos_ruc');
+        const inputsDni = divDni.querySelectorAll('input');
+        const inputRuc = document.getElementById('razon_social');
+
+        if (valorTipo === 'ruc') {
+            // Caso RUC: Mostrar Razón Social y remover campos requeridos de DNI
+            divDni.style.display = 'none';
+            divRuc.style.display = 'block';
+            
+            inputsDni.forEach(i => i.removeAttribute('required'));
+            if (inputRuc) inputRuc.setAttribute('required', 'required');
+
+        } else {
+            // Caso Persona Natural (DNI, CE, Pasaporte, Otro)
+            divDni.style.display = 'block';
+            divRuc.style.display = 'none';
+            
+            inputsDni.forEach(i => i.setAttribute('required', 'required'));
+            if (inputRuc) inputRuc.removeAttribute('required');
+
+            // Habilitar edición manual si el documento es internacional/manual
+            const esManual = (valorTipo === 'ce' || valorTipo === 'pasaporte' || valorTipo === 'otro');
+            inputsDni.forEach(i => {
+                if (esManual) {
+                    i.removeAttribute('readonly');
+                    i.classList.remove('bg-light');
+                } else {
+                    // Si vuelve a ser DNI se bloquea para autocompletado por API
+                    i.setAttribute('readonly', 'readonly');
+                    i.classList.add('bg-light');
+                }
+            });
+        }
+    }
+});
+</script>
+
+{% endblock %}

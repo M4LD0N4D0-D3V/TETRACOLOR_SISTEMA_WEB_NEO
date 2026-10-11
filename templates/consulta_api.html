@@ -1,0 +1,144 @@
+<!-- Selector de Tipo de Documento -->
+<div class="mb-3">
+    <label for="tipo_doc" class="form-label fw-bold">Tipo de Documento</label>
+    <select class="form-select" id="tipo_doc" name="tipo_doc" onchange="cambiarTipoDoc()">
+        <option value="dni" selected>DNI (Perú)</option>
+        <option value="ruc">RUC (Empresa)</option>
+        <option value="ce">Carné de Extranjería (CE)</option>
+        <option value="pasaporte">Pasaporte</option>
+        <option value="otro">Otro Documento</option>
+    </select>
+</div>
+
+<!-- Input de Número de Documento y Botón Buscar -->
+<div class="mb-3">
+    <label for="documento" class="fw-bold" id="labelDocumento">Número de DNI</label>
+    <div class="input-group">
+        <input type="text" class="form-control" id="documento" name="documento" placeholder="Ingresa DNI (8 dígitos)" required maxlength="8">
+        <button class="btn btn-dark" type="button" id="btnBuscar" onclick="buscarDatos()">
+            Buscar <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+        </button>
+    </div>
+    <small class="text-muted" id="ayudaApi" style="font-size: 0.8em;">Presiona buscar para autocompletar tus datos.</small>
+</div>
+
+<script>
+    // Función para cambiar la interfaz según el tipo de documento seleccionado
+    function cambiarTipoDoc() {
+        const tipo = document.getElementById('tipo_doc').value;
+        const inputDoc = document.getElementById('documento');
+        const labelDoc = document.getElementById('labelDocumento');
+        const btnBuscar = document.getElementById('btnBuscar');
+        const ayudaApi = document.getElementById('ayudaApi');
+
+        const divCamposDni = document.getElementById('campos_dni');
+        const divCamposRuc = document.getElementById('campos_ruc');
+
+        const inputNombres = document.getElementById('nombres');
+        const inputPaterno = document.getElementById('apellido_paterno');
+        const inputMaterno = document.getElementById('apellido_materno');
+        const inputRazonSocial = document.getElementById('razon_social');
+
+        // Limpiar campo de documento al cambiar de opción
+        inputDoc.value = '';
+
+        if (tipo === 'dni') {
+            labelDoc.innerText = 'Número de DNI';
+            inputDoc.placeholder = 'Ingresa DNI (8 dígitos)';
+            inputDoc.maxLength = 8;
+            btnBuscar.classList.remove('d-none');
+            if (ayudaApi) ayudaApi.style.display = 'block';
+
+            // Mostrar sección de personas, ocultar RUC
+            if (divCamposDni) divCamposDni.style.display = 'block';
+            if (divCamposRuc) divCamposRuc.style.display = 'none';
+
+            // Habilitar campos de personas pero como 'readonly' (llenado por API)
+            if (inputNombres) { inputNombres.disabled = false; inputNombres.readOnly = true; inputNombres.classList.add('bg-light'); }
+            if (inputPaterno) { inputPaterno.disabled = false; inputPaterno.readOnly = true; inputPaterno.classList.add('bg-light'); }
+            if (inputMaterno) { inputMaterno.disabled = false; inputMaterno.readOnly = true; inputMaterno.classList.add('bg-light'); }
+            if (inputRazonSocial) { inputRazonSocial.disabled = true; }
+
+        } else if (tipo === 'ruc') {
+            labelDoc.innerText = 'Número de RUC';
+            inputDoc.placeholder = 'Ingresa RUC (11 dígitos)';
+            inputDoc.maxLength = 11;
+            btnBuscar.classList.remove('d-none');
+            if (ayudaApi) ayudaApi.style.display = 'block';
+
+            // Ocultar personas, mostrar RUC
+            if (divCamposDni) divCamposDni.style.display = 'none';
+            if (divCamposRuc) divCamposRuc.style.display = 'block';
+
+            // Deshabilitar campos de personas y habilitar RUC como 'readonly'
+            if (inputNombres) inputNombres.disabled = true;
+            if (inputPaterno) inputPaterno.disabled = true;
+            if (inputMaterno) inputMaterno.disabled = true;
+            if (inputRazonSocial) { inputRazonSocial.disabled = false; inputRazonSocial.readOnly = true; inputRazonSocial.classList.add('bg-light'); }
+
+        } else {
+            // Documentos sin API pública (CE, Pasaporte, Otro)
+            labelDoc.innerText = 'Número de Documento / Pasaporte';
+            inputDoc.placeholder = 'Ingresa número de documento';
+            inputDoc.removeAttribute('maxlength');
+            btnBuscar.classList.add('d-none'); // Ocultar botón de consulta API
+            if (ayudaApi) ayudaApi.style.display = 'none';
+
+            // Mostrar campos de personas y permitir escritura manual (quitar readonly)
+            if (divCamposDni) divCamposDni.style.display = 'block';
+            if (divCamposRuc) divCamposRuc.style.display = 'none';
+
+            if (inputNombres) { inputNombres.disabled = false; inputNombres.readOnly = false; inputNombres.classList.remove('bg-light'); }
+            if (inputPaterno) { inputPaterno.disabled = false; inputPaterno.readOnly = false; inputPaterno.classList.remove('bg-light'); }
+            if (inputMaterno) { inputMaterno.disabled = false; inputMaterno.readOnly = false; inputMaterno.classList.remove('bg-light'); }
+            if (inputRazonSocial) { inputRazonSocial.disabled = true; }
+        }
+    }
+
+    // Función que consulta a la API Flask
+    async function buscarDatos() {
+        const tipo = document.getElementById('tipo_doc').value;
+        const documento = document.getElementById('documento').value;
+        const spinner = document.getElementById('spinner');
+
+        if (tipo !== 'dni' && tipo !== 'ruc') return;
+
+        if (tipo === 'dni' && documento.length !== 8) return alert("El DNI debe tener 8 dígitos.");
+        if (tipo === 'ruc' && documento.length !== 11) return alert("El RUC debe tener 11 dígitos.");
+
+        spinner.classList.remove('d-none');
+
+        const url = `/api/consultar?tipo=${tipo}&numero=${documento}`;
+
+        try {
+            const respuesta = await fetch(url);
+
+            if (!respuesta.ok && respuesta.status === 500) {
+                throw new Error("Error interno en tu archivo app.py. Revisa la terminal.");
+            }
+
+            const datos = await respuesta.json();
+
+            if (datos.error) throw new Error(datos.error);
+
+            const resultado = datos.data ? datos.data : datos;
+
+            if (tipo === 'dni') {
+                document.getElementById('nombres').value = resultado.first_name || resultado.nombres || '';
+                document.getElementById('apellido_paterno').value = resultado.first_last_name || resultado.apellidoPaterno || resultado.apellido_paterno || '';
+                document.getElementById('apellido_materno').value = resultado.second_last_name || resultado.apellidoMaterno || resultado.apellido_materno || '';
+            } else if (tipo === 'ruc') {
+                document.getElementById('razon_social').value = resultado.company_name || resultado.razon_social || resultado.razonSocial || '';
+            }
+
+        } catch (error) {
+            console.error("Detalle del error:", error);
+            alert(error.message || "Error al buscar el documento. Revisa la consola.");
+        } finally {
+            spinner.classList.add('d-none');
+        }
+    }
+
+    // Configurar vista inicial al cargar el DOM
+    document.addEventListener("DOMContentLoaded", cambiarTipoDoc);
+</script>

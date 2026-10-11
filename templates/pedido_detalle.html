@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold"><i class="text-tetra-green">●</i> Detalle del Pedido #{{ pedido.id }}</h2>
+    <a href="/pedidos" class="btn btn-secondary">Volver a Pedidos</a>
+</div>
+
+<div class="row">
+    <!-- COLUMNA IZQUIERDA: CLIENTE -->
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-tetra-dark text-white fw-bold">
+                Información del Cliente
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>Nombre:</strong> {{ pedido.cliente }}</p>
+                <p class="mb-1"><strong>Correo:</strong> {{ pedido.correo_cliente }}</p>
+                <hr>
+                <p class="mb-1"><strong>Fecha de Ingreso:</strong> <br> {{ pedido.fecha }}</p>
+                <p class="mb-1"><strong>Atendido por:</strong> <br>
+                    {% if pedido.empleado %}
+                        {{ pedido.empleado }} (Presencial)
+                    {% else %}
+                        Sistema Web (Autogestión)
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- COLUMNA DERECHA: TÉCNICO, ADJUNTOS, COMPROBANTES Y PAGOS -->
+    <div class="col-md-8">
+        <!-- DETALLES TÉCNICOS -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-tetra-green text-white fw-bold">
+                Detalles Técnicos y Cotización
+            </div>
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="fw-bold mb-0">{{ pedido.producto }}</h4>
+                    <span class="badge fs-6 
+                        {% if pedido.estado == 'Pendiente' %} bg-warning text-dark
+                        {% elif pedido.estado == 'Completado' %} bg-success
+                        {% else %} bg-primary {% endif %}">
+                        Estado: {{ pedido.estado }}
+                    </span>
+                </div>
+                
+                <h5 class="text-danger fw-bold mb-4">Precio Base: S/ {{ pedido.precio_base }}</h5>
+                
+                <h6 class="fw-bold border-bottom pb-2">Especificaciones elegidas por el cliente:</h6>
+                <div class="bg-light p-3 rounded mb-3">
+                    {% if pedido.especificaciones %}
+                        {% set specs = pedido.especificaciones.split(' | ') %}
+                        <ul class="mb-0">
+                            {% for spec in specs %}
+                                <li>{{ spec }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted mb-0">No se indicaron detalles adicionales.</p>
+                    {% endif %}
+                </div>
+
+                {% if pedido.archivo_diseno %}
+                <div class="mt-4 p-3 bg-light border rounded border-primary border-opacity-25">
+                    <h6 class="fw-bold mb-2 text-primary"><i class="bi bi-paperclip"></i> Diseño Adjunto por el Cliente:</h6>
+                    <a href="/static/uploads/disenos/{{ pedido.archivo_diseno }}" target="_blank" class="btn btn-primary shadow-sm mt-1">
+                        <i class="bi bi-image"></i> Ver Archivo Original
+                    </a>
+                    <small class="text-muted ms-2 d-block mt-2"><i class="bi bi-info-circle"></i> Se abrirá de forma segura en una nueva pestaña.</small>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+        <!-- SECCIÓN: BITÁCORA Y ENVÍO DE COMPROBANTES -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-tetra-dark text-white fw-bold">
+                <i class="bi bi-chat-left-text text-success"></i> Bitácora, Aclaraciones y Comprobantes
+            </div>
+            <div class="card-body">
+                <!-- Contenedor del Historial de Mensajes / Comprobantes -->
+                <div class="p-3 bg-light rounded border mb-3" style="max-height: 320px; overflow-y: auto;">
+                    {% set chat_ped = mensajes if mensajes is defined else [] %}
+                    {% for msg in chat_ped %}
+                        <div class="mb-2 p-2 rounded-3 {% if msg.remitente_rol == 'cliente' %}bg-success text-white text-end ms-4 shadow-sm{% else %}bg-white text-dark text-start me-4 shadow-sm border{% endif %}" style="font-size: 0.9rem;">
+                            <strong class="d-block" style="font-size: 0.75rem;">
+                                {% if msg.remitente_rol == 'cliente' %}👤 Cliente / Tú{% else %}🛠️ Empresa / Admin{% endif %}
+                            </strong>
+                            {% if msg.mensaje %}<span class="d-block mb-1">{{ msg.mensaje }}</span>{% endif %}
+                            
+                            {% if msg.archivo_adjunto %}
+                                <div class="mt-2 mb-1">
+                                    <a href="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" target="_blank">
+                                        <img src="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" alt="Comprobante / Adjunto" style="max-width: 180px; max-height: 180px; object-fit: cover;" class="rounded border">
+                                    </a>
+                                </div>
+                            {% endif %}
+                            
+                            <small class="d-block {% if msg.remitente_rol == 'cliente' %}text-white-50{% else %}text-muted{% endif %}" style="font-size: 0.65rem;">
+                                {{ msg.fecha.strftime('%d/%m/%Y %H:%M') if msg.fecha else '' }}
+                            </small>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4 small">
+                            <i class="bi bi-chat-square-dots fs-3 d-block mb-2"></i>
+                            Sin observaciones ni comprobantes adjuntados aún.
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Formulario para enviar adjunto o aclaración -->
+                <form action="/pedido/{{ pedido.id }}/enviar_mensaje" method="POST" enctype="multipart/form-data">                    {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>{% endif %}
+                    
+                    <div class="input-group">
+                        <input type="text" name="mensaje" class="form-control" placeholder="Añadir detalle o mensaje sobre el comprobante...">
+                        
+                        <input type="file" name="adjunto" id="adjuntoCliente{{ pedido.id }}" class="d-none" accept="image/*,.pdf" onchange="previewCliente(this, 'previewTextCliente{{ pedido.id }}')">
+                        
+                        <label for="adjuntoCliente{{ pedido.id }}" class="btn btn-outline-secondary bg-white text-dark" title="Adjuntar foto de comprobante">
+                            <i class="bi bi-paperclip"></i>
+                        </label>
+                        
+                        <button class="btn btn-success" type="submit">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="previewTextCliente{{ pedido.id }}" class="text-success small fw-bold mt-1"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- HISTORIAL DE PAGOS Y ADELANTOS -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                <span>Historial de Pagos / Adelantos</span>
+            </div>
+            <div class="card-body p-0">
+                {% if pagos %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Método de Pago</th>
+                                <th>N° Referencia / Voucher</th>
+                                <th class="text-end">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pago in pagos %}
+                            <tr>
+                                <td>{{ pago.fecha }}</td>
+                                <td><span class="badge bg-info text-dark">{{ pago.metodo_pago }}</span></td>
+                                <td>{{ pago.referencia_voucher or 'N/A' }}</td>
+                                <td class="text-end fw-bold text-success">S/ {{ pago.monto }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    No hay pagos ni adelantos registrados para este pedido.
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-white text-end py-3">
+                <button class="btn btn-outline-success" onclick="window.print()">Imprimir Ficha</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function previewCliente(input, previewId) {
+    const contenedor = document.getElementById(previewId);
+    if (input.files && input.files[0]) {
+        contenedor.innerHTML = '<i class="bi bi-file-earmark-image"></i> Archivo listo para enviar: ' + input.files[0].name;
+    } else {
+        contenedor.innerHTML = '';
+    }
+}
+</script>
+
+{% endblock %}
