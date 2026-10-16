@@ -1,37 +1,114 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="card bg-dark text-white border-0 mb-5 shadow-lg overflow-hidden" style="border-radius: 15px;">
-    <img src="{{ url_for('static', filename='assets/logo/bann.jpg') }}" style="height: 350px; object-fit: cover; opacity: 0.4;">
-    <div class="card-img-overlay d-flex flex-column justify-content-center align-items-center text-center">
-        <h1 class="display-3 fw-bold text-tetra-green text-shadow">Estampados y Etiquetas</h1>
+
+<!-- HERO BANNER -->
+<div class="position-relative bg-dark text-white overflow-hidden mb-5 shadow-lg">
+    <img src="{{ url_for('static', filename='assets/logo/bann.jpg') }}" alt="TETRACOLOR Banner" class="w-100 opacity-40" style="height: 340px; object-fit: cover;">
+    <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center text-center p-4" style="background: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.75));">
+        <h1 class="display-3 fw-bold text-success text-shadow mb-2">Estampados y Etiquetas</h1>
         <p class="lead fs-4 text-light">Calidad, innovación y rapidez para tus prendas de vestir.</p>
+        <a href="#catalogo" class="btn btn-success btn-lg rounded-pill px-4 mt-2 fw-bold shadow">
+            Ver Catálogo de Servicios
+        </a>
     </div>
 </div>
 
-<h2 class="text-center fw-bold mb-4">CATÁLOGO DE SERVICIOS</h2>
-<hr class="w-25 mx-auto mb-5 text-tetra-green border-3 opacity-100">
+<div class="container" id="catalogo">
 
-<div class="row row-cols-1 row-cols-md-3 g-5">
-    {% for p in productos %}
-    <div class="col">
-        <div class="card product-card h-100 rounded-4 overflow-hidden">
-            {% if p.imagen %}
-                <img src="{{ p.imagen }}" class="card-img-top" alt="{{ p.nombre_producto }}">
-            {% else %}
-                <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center text-white">Sin Imagen</div>
-            {% endif %}
-            
-            <div class="card-body d-flex flex-column text-center">
-                <h5 class="card-title fw-bold">{{ p.nombre_producto }}</h5>
-                <h4 class="text-danger fw-bold my-3">
-                    {% if p.precio > 0 %} S/ {{ p.precio }} {% else %} Cotizar {% endif %}
-                </h4>
-                <div class="mt-auto">
-                    <a href="/producto/{{ p.id }}" class="btn btn-tetra-green w-100 fw-semibold py-2">Ver Detalles</a>
+    <div class="text-center mb-5">
+        <h2 class="fw-bold display-6 text-uppercase tracking-wider">CATÁLOGO DE SERVICIOS</h2>
+        <div class="mx-auto bg-success rounded" style="width: 80px; height: 4px;"></div>
+    </div>
+
+    <!-- GRILLA DE PRODUCTOS -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-2 g-4">
+        {% for p in productos %}
+        <div class="col">
+            <a href="/producto/{{ p.id }}" class="text-decoration-none">
+                <div class="card card-large-product">
+                    
+                    <!-- IMAGEN CON DESCRIPCIÓN EN HOVER -->
+                    <div class="card-img-large-wrapper">
+                        
+                        <!-- Overlay Superior de Categoría -->
+                        <div class="card-top-title-overlay">
+                            {% if 'Polos' in p.nombre_producto %}
+                                POLOS PUBLICITARIOS
+                            {% elif 'Relieve' in p.nombre_producto %}
+                                ESTAMPADO 3D HIGH DENSITY
+                            {% elif 'Brillo' in p.nombre_producto %}
+                                ACABADOS METALIZADOS & GLITTER
+                            {% else %}
+                                SERVICIO DE IMPRENTA
+                            {% endif %}
+                        </div>
+
+                        <!-- OVERLAY DESCRIPCIÓN COMPLETA AL PASAR EL CURSOR -->
+                        <div class="card-desc-overlay">
+                            <h6 class="text-success fw-bold text-uppercase mb-2">
+                                <i class="bi bi-info-circle me-1"></i>Detalles del Servicio
+                            </h6>
+                            <p class="small text-light mb-0" style="line-height: 1.5; font-size: 0.9rem;">
+                                {% if p.descripcion %}
+                                    {{ p.descripcion|striptags }}
+                                {% else %}
+                                    Servicio profesional de estampado y confección con acabados de alta calidad para producción textil.
+                                {% endif %}
+                            </p>
+                        </div>
+
+                        {% if p.imagen %}
+                            <img src="{{ p.imagen }}" alt="{{ p.nombre_producto }}">
+                        {% else %}
+                            <div class="w-100 h-100 d-flex align-items-center justify-content-center text-white bg-secondary fs-4">Sin Imagen</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- BARRA INFERIOR -->
+                    <div class="card-bottom-bar">
+                        <div class="card-info-left">
+                            <span class="brand-name">TETRACOLOR</span>
+                            <h3 class="product-name">{{ p.nombre_producto }}</h3>
+                        </div>
+
+                        <div class="card-price-block">
+                            {% if p.precio > 0 %}
+                                <span class="price-main">S/{{ "%.2f"|format(p.precio) }}</span>
+                                <span class="price-sub">P. Cotización</span>
+                            {% else %}
+                                <span class="price-main">Cotizar</span>
+                                <span class="price-sub">Ver Detalles</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- SECCIÓN UBÍCANOS EN HUANCAYO -->
+    <div id="ubicacion" class="my-5 pt-4">
+        <div class="card border-0 rounded-4 shadow-sm bg-white overflow-hidden">
+            <div class="card-body p-4 p-md-5">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center mb-3 mb-md-0">
+                        <div class="bg-success text-white p-3 rounded-circle d-inline-block">
+                            <i class="bi bi-geo-alt-fill display-5"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-10">
+                        <span class="badge bg-dark mb-2">SEDE PRINCIPAL - HUANCAYO</span>
+                        <h4 class="fw-bold mb-1">Galería Industriales Wanka</h4>
+                        <p class="text-muted mb-1">Prolongación Ica 137, Stand 22 - 3er Nivel</p>
+                        <p class="small text-secondary mb-0">Atención de Lunes a Sábado de 8:00 AM a 7:30 PM para muestras físicas de acabados y pedidos masivos.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    {% endfor %}
+
 </div>
+
 {% endblock %}

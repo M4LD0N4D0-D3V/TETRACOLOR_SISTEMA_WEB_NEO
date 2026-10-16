@@ -1,22 +1,38 @@
-from datetime import datetime, timedelta
 import os
-import requests
-from werkzeug.utils import secure_filename
-from flask import Flask, render_template, request, redirect, url_for, session, flash
-from flask_bcrypt import Bcrypt
-from functools import wraps
-from datetime import datetime
-from db import db, Usuario, Producto, get_connection
-from flask import jsonify, request
 import re
-import psycopg2.extras
-import os
 import time
-from flask import request, redirect, flash, session, url_for, render_template
+import requests
+import psycopg2.extras
+import mercadopago
+from datetime import datetime, timedelta
+from functools import wraps
+from dotenv import load_dotenv
+load_dotenv()
+
+# Inicializar Mercado Pago con el token del .env
+mp_access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+sdk = mercadopago.SDK(mp_access_token)
+
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask_bcrypt import Bcrypt
 from werkzeug.utils import secure_filename
+from sqlalchemy import func, text
+from db import db, Usuario, Producto, Pedido, TipoDocumento, get_connection 
 
 app = Flask(__name__)
-app.secret_key = "clave_secreta_segura"
+
+app.secret_key = os.getenv("SECRET_KEY", "clave_por_defecto_respaldo")
+
+
+
+# ==========================================
+# CONFIGURACIÓN DE BASE DE DATOS (.ENV)
+# ==========================================
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
+bcrypt = Bcrypt(app)
 # ==========================================
 # --- SISTEMA DE SEGURIDAD PERSISTENTE (BD) ---
 # ==========================================
@@ -105,7 +121,7 @@ def resetear_ip(ip):
 # ==========================================
 # CONFIGURACIÓN DE SUBIDA DE ARCHIVOS
 # ==========================================
-# Carpeta donde se guardarán las imágenes (Asegúrate de crearla en tu proyecto)
+# Carpeta donde se guardarán las imágenes
 UPLOAD_FOLDER = 'static/uploads/disenos'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Limitar el tamaño a 5MB por seguridad
@@ -115,16 +131,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 # Crear la carpeta si no existe
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# Configuración de Base de Datos
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.byixvuagnonvxjhhsnkn:SCARFSKYLA21@aws-1-us-west-2.pooler.supabase.com:6543/postgres'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db.init_app(app)
-bcrypt = Bcrypt(app)
 
 # ==========================================
 # DECORADORES DE SEGURIDAD
@@ -265,9 +273,13 @@ def registro():
 
     if request.method == 'POST':
         documento = request.form["documento"]
-        tipo_doc = request.form.get("tipo_doc", "dni") # Capturamos el tipo de documento
+        tipo_doc = request.form.get("tipo_doc", "dni") # Capturamos el texto (ej: "dni")
         
-        # LÓGICA DE NOMBRE: Si es RUC usa Razón Social, para cualquier otro tipo (DNI, CE, Pasaporte) construye con nombres y apellidos
+        # --- SOLUCIÓN 1: BUSCAMOS EL ID NUMÉRICO EN LA BASE DE DATOS ---
+        tipo_bd = TipoDocumento.query.filter(TipoDocumento.nombre.ilike(tipo_doc)).first()
+        id_tipo_doc = tipo_bd.id if tipo_bd else None
+        
+        # LÓGICA DE NOMBRE: Si es RUC usa Razón Social, para cualquier otro tipo construye con nombres y apellidos
         if tipo_doc.lower() == "ruc":
             nombre_completo = request.form.get("razon_social", "")
         else:
@@ -279,6 +291,12 @@ def registro():
         telefono = request.form["telefono"]
         correo = request.form["correo"]
         clave = request.form["clave"]
+        
+        # Capturamos los datos de ubicación
+        direccion = request.form.get("direccion", "")
+        departamento = request.form.get("departamento", "")
+        provincia = request.form.get("provincia", "")
+        distrito = request.form.get("distrito", "")
         
         # ==========================================
         # VALIDACIONES ESTRICTAS DE FORMATO
@@ -298,14 +316,18 @@ def registro():
             
         pw_hash = bcrypt.generate_password_hash(clave).decode('utf-8')
         
-        # Guardamos en la base de datos pasando 'tipo_documento'
+        # Guardamos en la base de datos usando el ID numérico
         nuevo = Usuario(
-            tipo_documento=tipo_doc,
+            id_tipo_documento=id_tipo_doc, # <--- Ahora esto funciona perfectamente
             documento=documento, 
             nombre=nombre_completo, 
             telefono=telefono, 
             correo=correo, 
-            clave=pw_hash
+            clave=pw_hash,
+            direccion=direccion,
+            departamento=departamento,
+            provincia=provincia,
+            distrito=distrito
         )
         
         db.session.add(nuevo)
@@ -324,7 +346,11 @@ def registro_presencial():
     if request.method == "POST":
 
         documento = request.form["documento"]
-        tipo_doc = request.form.get("tipo_doc", "dni") # Capturamos el tipo de documento
+        tipo_doc = request.form.get("tipo_doc", "dni")
+
+        # --- SOLUCIÓN 2: BUSCAMOS EL ID NUMÉRICO EN LA BASE DE DATOS PARA PRESENCIAL ---
+        tipo_bd = TipoDocumento.query.filter(TipoDocumento.nombre.ilike(tipo_doc)).first()
+        id_tipo_doc = tipo_bd.id if tipo_bd else None
 
         # LÓGICA DE NOMBRE: RUC = Razón Social | Otros (DNI, CE, Pasaporte) = Nombres + Apellidos
         if tipo_doc.lower() == "ruc":
@@ -367,9 +393,9 @@ def registro_presencial():
         # GENERAR HASH
         pw_hash = bcrypt.generate_password_hash(clave).decode('utf-8')
 
-        # CREAR USUARIO CON TIPO DE DOCUMENTO
+        # CREAR USUARIO CON EL ID DEL TIPO DE DOCUMENTO CORRECTO
         nuevo = Usuario(
-            tipo_documento=tipo_doc,
+            id_tipo_documento=id_tipo_doc, # <--- Corregido: antes decía tipo_documento=tipo_doc
             documento=documento,
             nombre=nombre_completo,
             telefono=telefono,
@@ -1113,36 +1139,272 @@ def nosotros():
 
 ##################################################################
 @app.route('/admin/nuevo_usuario_sistema', methods=['GET', 'POST'])
+@login_required
+@admin_required
 def admin_nuevo_usuario_sistema():
-    # Proteger la ruta: Solo administradores logueados pueden entrar
-    if 'admin_id' not in session or session.get('admin_rol') != 'Administrador':
-        flash('Acceso denegado. Se requieren permisos de Administrador principal.', 'danger')
-        return redirect(url_for('admin_login'))
+    conn = get_connection()
+    cursor = conn.cursor()
 
     if request.method == 'POST':
-        nombre_completo = request.form['nombre_completo']
+        nombres = request.form['nombre_completo']
+        id_tipo_doc = request.form.get('id_tipo_documento')
+        documento = request.form.get('documento')
         correo = request.form['correo']
+        telefono = request.form.get('telefono', '')        
+        direccion = request.form.get('direccion', '')
+        departamento = request.form.get('departamento', '')
+        provincia = request.form.get('provincia', '')
+        distrito = request.form.get('distrito', '')
         password = request.form['password']
-        rol = request.form['rol']
-        estado = request.form['estado']
+        rol = request.form['rol'].lower()  # Se convierte a minúsculas para cumplir el CHECK de BD ('administrador', 'asistente', 'consultor')
+        estado = request.form.get('estado', 'Activo')
         
-        hashed_password = generate_password_hash(password)
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         
-        cursor = db.cursor()
         sql = """INSERT INTO usuarios_sistema 
-                 (nombre_completo, correo, password, rol, estado) 
-                 VALUES (%s, %s, %s, %s, %s)"""
-        valores = (nombre_completo, correo, hashed_password, rol, estado)
+                 (nombres, correo, clave, rol, estado, id_tipo_documento, documento, telefono, direccion, departamento, provincia, distrito) 
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        valores = (nombres, correo, hashed_password, rol, estado, id_tipo_doc, documento, telefono, direccion, departamento, provincia, distrito)
         
         try:
             cursor.execute(sql, valores)
-            db.commit()
-            flash('Usuario del sistema registrado correctamente.', 'success')
-            return redirect(url_for('admin_usuarios_sistema')) # Asumiendo que tienes una vista que los lista
+            conn.commit()
+            flash('Personal del sistema registrado correctamente.', 'success')
+            return redirect('/pedidos')
         except Exception as e:
+            conn.rollback()
             flash(f'Error al registrar el usuario: {str(e)}', 'danger')
+        finally:
+            conn.close()
+
+    # Si es GET, consultamos los tipos de documento activos para el selector
+    cursor.execute("SELECT id, nombre FROM tipo_documento WHERE estado = 'Activo'")
+    tipos_doc = cursor.fetchall()
+    conn.close()
+
+    return render_template('admin/nuevo_usuario_sistema.html', tipos_doc=tipos_doc)
+
+
+
+###############################
+
+# ==========================================
+# DASHBOARD ADMINISTRATIVO (VERSIÓN OPTIMIZADA CON VISTAS)
+# ==========================================
+@app.route('/admin/dashboard')
+# @admin_required  # O el decorador que uses para proteger rutas
+def admin_dashboard():
+    # ----------------------------------------
+    # 1. MÉTRICAS DE CLIENTES
+    # ----------------------------------------
+    total_clientes = Usuario.query.count()
+    
+    # Consultar la vista de nuevos clientes del mes
+    query_nuevos = db.session.execute(text("SELECT nuevos_clientes FROM vista_nuevos_usuarios_mes")).fetchone()
+    clientes_mes = query_nuevos[0] if query_nuevos and query_nuevos[0] else 0
+
+    # ----------------------------------------
+    # 2. MÉTRICAS GLOBALES (Ingresos y Saldo)
+    # ----------------------------------------
+    total_pedidos = Pedido.query.count()
+    ingresos_totales = db.session.query(func.sum(Pedido.total_pagado)).scalar() or 0.0
+
+    # Saldo pendiente: lo que cuesta el producto menos lo que ya pagaron
+    saldo_pendiente = db.session.query(
+        func.sum((Pedido.cantidad * Producto.precio) - Pedido.total_pagado)
+    ).select_from(Pedido).join(Producto, Pedido.id_producto == Producto.id)\
+     .filter(Pedido.estado != 'Anulado').scalar() or 0.0
+
+    # ----------------------------------------
+    # 3. HISTÓRICO PARA GRÁFICAS (Usando la vista)
+    # ----------------------------------------
+    query_historico = db.session.execute(text("SELECT mes, total_ingresos FROM vista_ingresos_historicos")).fetchall()
+    historico = [{'mes': row[0], 'total_ingresos': float(row[1])} for row in query_historico]
+
+    # Calcular Crecimiento de ventas (Mes actual vs Mes anterior)
+    crecimiento_ventas = 0.0
+    if len(historico) >= 2:
+        ventas_actual = historico[-1]['total_ingresos']
+        ventas_anterior = historico[-2]['total_ingresos']
+        if ventas_anterior > 0:
+            crecimiento_ventas = ((ventas_actual - ventas_anterior) / ventas_anterior) * 100
+    elif len(historico) == 1:
+        crecimiento_ventas = 100.0
+
+    # ----------------------------------------
+    # 4. ESTADOS DE PEDIDOS Y CUMPLIMIENTO (Usando la vista)
+    # ----------------------------------------
+    query_estados = db.session.execute(text("SELECT estado, cantidad FROM vista_distribucion_estados")).fetchall()
+    estados = [{'estado': row[0], 'cantidad': int(row[1])} for row in query_estados]
+
+    # Calcular Tasa de cumplimiento
+    pedidos_entregados = sum(e['cantidad'] for e in estados if e['estado'] in ['Completado', 'Entregado'])
+    tasa_cumplimiento = (pedidos_entregados / total_pedidos * 100) if total_pedidos > 0 else 0.0
+
+    # ----------------------------------------
+    # 5. PREPARAR DATOS PARA CHART.JS
+    # ----------------------------------------
+    chart_meses = [item['mes'] for item in historico]
+    chart_ingresos = [float(item['total_ingresos']) for item in historico]
+    chart_estados_labels = [item['estado'] for item in estados]
+    chart_estados_data = [item['cantidad'] for item in estados]
+
+    ingresos_data = {
+        'ingresos_totales': ingresos_totales,
+        'cantidad_pedidos': total_pedidos
+    }
+
+    return render_template(
+        'admin/dashboard.html',
+        ingresos=ingresos_data,
+        saldo_pendiente=saldo_pendiente,
+        crecimiento_ventas=round(crecimiento_ventas, 2),
+        tasa_cumplimiento=round(tasa_cumplimiento, 2),
+        clientes_mes=clientes_mes,
+        clientes_totales=total_clientes,
+        chart_meses=chart_meses,
+        chart_ingresos=chart_ingresos,
+        chart_estados_labels=chart_estados_labels,
+        chart_estados_data=chart_estados_data
+    )
+#########################
+
+# ==========================================
+# PASARELA DE PAGO: MERCADO PAGO
+# ========================================
+
+@app.route('/api/crear_preferencia_mp/<int:pedido_id>', methods=['POST'])
+@login_required
+def crear_preferencia_mp(pedido_id):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # 1. Buscar el pedido y validar que pertenezca al usuario logueado
+        cursor.execute('''
+            SELECT p.id, pr.nombre_producto, p.cantidad, pr.precio, p.total_pagado, p.adelanto
+            FROM pedido p
+            JOIN producto pr ON p.id_producto = pr.id
+            WHERE p.id = %s AND p.id_usuario = %s
+        ''', (pedido_id, session['usuario_id']))
+        pedido = cursor.fetchone()
+        
+        if not pedido:
+            return jsonify({"error": "Pedido no encontrado o no autorizado"}), 404
             
-    return render_template('admin/nuevo_usuario_sistema.html')
+        # 2. Calcular el saldo pendiente real
+        costo_total = float(pedido['total_pagado']) if float(pedido['total_pagado']) > 0 else float(pedido['cantidad'] * pedido['precio'])
+        adelanto = float(pedido['adelanto'] or 0)
+        saldo = costo_total - adelanto
+        
+        if saldo <= 0.01:
+            return jsonify({"error": "Este pedido ya se encuentra pagado en su totalidad."}), 400
+
+        # 3. Crear la "Preferencia" de Mercado Pago (El carrito virtual)
+        preference_data = {
+            "items": [
+                {
+                    "title": f"Pago de saldo - Pedido #{pedido_id} ({pedido['nombre_producto']})",
+                    "quantity": 1,
+                    "currency_id": "PEN",
+                    "unit_price": saldo
+                }
+            ],
+            "back_urls": {
+                "success": f"https://shiny-parakeet-r75pr99gxx43wvx5-5000.app.github.dev/pago_mp_respuesta/exito/{pedido_id}",
+                "failure": f"https://shiny-parakeet-r75pr99gxx43wvx5-5000.app.github.dev/pago_mp_respuesta/fallo/{pedido_id}",
+                "pending": f"https://shiny-parakeet-r75pr99gxx43wvx5-5000.app.github.dev/pago_mp_respuesta/pendiente/{pedido_id}"
+            },
+            "auto_return": "approved",
+            "external_reference": str(pedido_id)
+        }
+        
+        preference_response = sdk.preference().create(preference_data)
+        
+        # Imprimir la respuesta completa en la terminal
+        print("RESPUESTA MERCADO PAGO:", preference_response) 
+        
+        preference = preference_response["response"]
+        
+        # Si no hay init_point, evitamos que la app se rompa y mostramos el error
+        if "init_point" not in preference:
+            print("ERROR DETALLADO:", preference)
+            return jsonify({"error": "Error de credenciales o datos con Mercado Pago."}), 400
+
+        # 4. Devolver la URL de pago al Frontend
+        # Usar sandbox_init_point para pruebas con tarjetas de prueba
+        link_pago = preference.get("sandbox_init_point") or preference.get("init_point")
+        return jsonify({"init_point": link_pago})
+        
+    except Exception as e:
+        print(f"Error MercadoPago: {e}")
+        return jsonify({"error": "Error interno al conectar con la pasarela."}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/pago_mp_respuesta/<estado>/<int:pedido_id>')
+@login_required
+def pago_mp_respuesta(estado, pedido_id):
+    """Ruta a la que Mercado Pago redirige al cliente después de pagar"""
+    payment_id = request.args.get('payment_id')
+    status = request.args.get('status')
+    
+    if estado == 'exito' and status == 'approved':
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            # 1. Verificar si el pago ya fue registrado (evita que recarguen la página y dupliquen)
+            cursor.execute("SELECT id FROM historial_pagos WHERE referencia_voucher = %s", (f"MP-{payment_id}",))
+            if not cursor.fetchone():
+                
+                # 2. Obtener datos del pedido
+                cursor.execute("""
+                    SELECT adelanto, total_pagado, 
+                           (cantidad * (SELECT precio FROM producto WHERE id = id_producto)) AS costo_calc 
+                    FROM pedido WHERE id = %s
+                """, (pedido_id,))
+                ped = cursor.fetchone()
+                
+                costo_total = float(ped['total_pagado']) if ped['total_pagado'] > 0 else float(ped['costo_calc'])
+                adelanto_previo = float(ped['adelanto'] or 0)
+                monto_pagado = costo_total - adelanto_previo # Pagó el saldo restante
+                
+                # 3. Obtener el ID del método 'Mercado Pago'
+                cursor.execute("SELECT id FROM metodo_pago WHERE nombre = 'Mercado Pago'")
+                mp_method = cursor.fetchone()
+                mp_id = mp_method['id'] if mp_method else None
+                
+                # 4. Registrar en historial_pagos
+                cursor.execute("""
+                    INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, referencia_voucher, fecha)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                """, (pedido_id, monto_pagado, mp_id, f"MP-{payment_id}"))
+                
+                # 5. Actualizar el pedido marcándolo como pagado (adelanto = costo_total)
+                cursor.execute("""
+                    UPDATE pedido SET adelanto = %s, total_pagado = %s WHERE id = %s
+                """, (costo_total, costo_total, pedido_id))
+                
+                conn.commit()
+                flash(f"¡Pago procesado con éxito! El pedido #{pedido_id} ha sido cancelado.", "success")
+            else:
+                flash("Este pago ya había sido procesado anteriormente.", "info")
+                
+        except Exception as e:
+            conn.rollback()
+            print(f"Error BD Pago: {e}")
+            flash("Pago aprobado, pero hubo un error al registrarlo. Contacta a soporte.", "warning")
+        finally:
+            conn.close()
+            
+    elif estado == 'fallo':
+        flash(f"El pago del pedido #{pedido_id} fue rechazado o cancelado.", "danger")
+    elif estado == 'pendiente':
+        flash(f"El pago del pedido #{pedido_id} está pendiente de confirmación por Mercado Pago.", "warning")
+        
+    return redirect(url_for('mis_pedidos'))
+
 ############################################################################
 
 @app.route('/api/consultar')
@@ -1154,7 +1416,7 @@ def consultar_api():
         return jsonify({"error": "Faltan parámetros"}), 400
         
     # Tu token de Decolecta
-    token = 'sk_14915.2lHvs9UhJxBgNufMNSeDN9ZdTfyCdmBH' 
+    token = os.getenv("DECOLECTA_TOKEN") 
     
     if tipo == 'dni':
         url = f"https://api.decolecta.com/v1/reniec/dni?numero={numero}"
@@ -1184,6 +1446,37 @@ def consultar_api():
             
     except Exception as e:
         return jsonify({"error": f"Error de conexión: {str(e)}"}), 500
+
+#######
+# ==========================================
+# RUTAS PARA UBIGEO LOCAL (DEPARTAMENTO, PROVINCIA, DISTRITO)
+# ==========================================
+@app.route('/api/departamentos')
+def api_departamentos():
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT id, nombre FROM departamentos ORDER BY nombre ASC")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/api/provincias/<dep_id>')
+def api_provincias(dep_id):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT id, nombre FROM provincias WHERE departamento_id = %s ORDER BY nombre ASC", (dep_id,))
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/api/distritos/<prov_id>')
+def api_distritos(prov_id):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT id, nombre FROM distritos WHERE provincia_id = %s ORDER BY nombre ASC", (prov_id,))
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
 
 if __name__ == '__main__': 
     app.run(debug=True)

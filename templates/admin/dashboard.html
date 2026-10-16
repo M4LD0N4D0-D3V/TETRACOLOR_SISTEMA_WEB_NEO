@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Tetracolor Admin</title>
+    <!-- Bootstrap 5 CSS e Iconos -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <!-- Encabezado -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0"><i class="bi bi-speedometer2 text-primary"></i> Panel de Control Estratégico</h2>
+                <small class="text-muted">Resumen ejecutivo del estado financiero y operativo</small>
+            </div>
+            <a href="{{ url_for('pedidos') }}" class="btn btn-dark btn-sm fw-bold shadow-sm d-flex align-items-center gap-1">
+                <i class="bi bi-arrow-left"></i> Volver a Pedidos
+            </a>
+        </div>
+
+        <!-- TARJETAS KPI PRINCIPALES -->
+        <div class="row g-3 mb-4">
+            <!-- 1. Ingresos Recaudados -->
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm border-start border-success border-4 p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-bold">Ingresos Recaudados</span>
+                            {% set total_ingresos = ingresos.ingresos_totales if ingresos and ingresos.ingresos_totales is not none else 0.0 %}
+                            <h3 class="text-success fw-bold m-0">S/ {{ "%.2f"|format(total_ingresos) }}</h3>
+                        </div>
+                        <div class="bg-success-subtle p-2 rounded-circle text-success fs-4">
+                            <i class="bi bi-cash-coin"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted d-block mb-1"><i class="bi bi-check-circle"></i> Dinero pagado a la fecha</small>
+                        {% if crecimiento_ventas is defined %}
+                            {% if crecimiento_ventas >= 0 %}
+                                <span class="badge bg-success">+{{ crecimiento_ventas }}%</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ crecimiento_ventas }}%</span>
+                            {% endif %}
+                            <small class="text-muted" style="font-size: 0.75rem;">vs mes anterior</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Cuentas por Cobrar (Saldo Pendiente) -->
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm border-start border-danger border-4 p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-bold">Saldo Por Cobrar</span>
+                            {% set saldo_cobrar = saldo_pendiente if saldo_pendiente is defined and saldo_pendiente is not none else 0.0 %}
+                            <h3 class="text-danger fw-bold m-0">S/ {{ "%.2f"|format(saldo_cobrar) }}</h3>
+                        </div>
+                        <div class="bg-danger-subtle p-2 rounded-circle text-danger fs-4">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                    <small class="text-muted mt-2"><i class="bi bi-clock-history"></i> Pendiente de cobro en taller</small>
+                </div>
+            </div>
+
+            <!-- 3. Ticket Promedio -->
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm border-start border-primary border-4 p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-bold">Ticket Promedio</span>
+                            {% set total_peds = ingresos.cantidad_pedidos if ingresos and ingresos.cantidad_pedidos is not none else 0 %}
+                            {% set ticket_prom = (total_ingresos / total_peds) if total_peds > 0 else 0.0 %}
+                            <h3 class="text-primary fw-bold m-0">S/ {{ "%.2f"|format(ticket_prom) }}</h3>
+                        </div>
+                        <div class="bg-primary-subtle p-2 rounded-circle text-primary fs-4">
+                            <i class="bi bi-graph-up-arrow"></i>
+                        </div>
+                    </div>
+                    <small class="text-muted mt-2"><i class="bi bi-person-badge"></i> Promedio abonado por pedido</small>
+                </div>
+            </div>
+
+            <!-- 4. Pedidos y Clientes Totales -->
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm border-start border-info border-4 p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small text-uppercase fw-bold">Operación Global</span>
+                            <h3 class="text-info fw-bold m-0">{{ total_peds }} <span class="fs-6 text-muted fw-normal">pedidos</span></h3>
+                        </div>
+                        <div class="bg-info-subtle p-2 rounded-circle text-info fs-4">
+                            <i class="bi bi-people"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                            <small class="text-muted d-block mb-1"><i class="bi bi-person-check"></i> {{ clientes_totales|default(0) }} clientes activos ({{ clientes_mes|default(0) }} nuevos este mes)</small>                        {% if tasa_cumplimiento is defined %}
+                            <span class="badge {% if tasa_cumplimiento >= 95 %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ tasa_cumplimiento }}%
+                            </span>
+                            <small class="text-muted" style="font-size: 0.75rem;">Tasa de cumplimiento</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN DE GRÁFICOS -->
+        <!-- SECCIÓN DE GRÁFICOS -->
+        <div class="row g-4">
+            <div class="col-md-8">
+                <div class="card border-0 shadow-sm p-4 rounded-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold m-0"><i class="bi bi-bar-chart-fill text-primary"></i> Evolución Mensual de Ingresos</h6>
+                        {% if crecimiento_ventas is defined %}
+                            <span class="badge {% if crecimiento_ventas >= 0 %}bg-success{% else %}bg-danger{% endif %} px-3 py-2">
+                                {% if crecimiento_ventas >= 0 %}+{% endif %}{{ crecimiento_ventas }}% vs mes anterior
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div style="position: relative; height:300px;">
+                        <canvas id="chartIngresos"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm p-4 rounded-4">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart-fill text-warning"></i> Estado de los Pedidos</h6>
+                    <div style="position: relative; height:300px;">
+                        <canvas id="chartEstados"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transferencia segura de Jinja2 a JavaScript -->
+    <div id="chart-data" 
+         data-meses='{{ chart_meses | tojson | safe }}'
+         data-ingresos='{{ chart_ingresos | tojson | safe }}'
+         data-estados-labels='{{ chart_estados_labels | tojson | safe }}'
+         data-estados-data='{{ chart_estados_data | tojson | safe }}'>
+    </div>
+
+    <script>
+        const container = document.getElementById('chart-data');
+        const meses = JSON.parse(container.dataset.meses || '[]');
+        const ingresosData = JSON.parse(container.dataset.ingresos || '[]');
+        const estadosLabels = JSON.parse(container.dataset.estadosLabels || '[]');
+        const estadosData = JSON.parse(container.dataset.estadosData || '[]');
+
+        // Gráfico de Barras: Evolución de Ingresos
+        new Chart(document.getElementById('chartIngresos'), {
+            type: 'bar',
+            data: {
+                labels: meses,
+                datasets: [{ 
+                    label: 'Ingresos (S/)', 
+                    data: ingresosData, 
+                    backgroundColor: '#0d6efd',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // Gráfico de Donut: Distribución de Estados
+        new Chart(document.getElementById('chartEstados'), {
+            type: 'doughnut',
+            data: {
+                labels: estadosLabels,
+                datasets: [{ 
+                    data: estadosData, 
+                    backgroundColor: ['#198754', '#ffc107', '#dc3545', '#0dcaf0'] 
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    </script>
+</body>
+</html>

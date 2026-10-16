@@ -2,43 +2,241 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TETRACOLOR PERÚ</title>
+    
+    <!-- Fuentes -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=Open+Sans&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
     <style>
-        body { font-family: 'Open Sans', sans-serif; background-color: #f8f9fa; }
-        h1, h2, h3, h4, h5, .navbar-brand { font-family: 'Montserrat', sans-serif; }
+        :root {
+            --tetra-green: #198754;
+            --tetra-green-bright: #8cc63f;
+            --tetra-dark: #111111;
+            --bg-mate: #f8f9fa;
+        }
+
+        body { 
+            font-family: 'Open Sans', sans-serif; 
+            background-color: var(--bg-mate); 
+        }
+        h1, h2, h3, h4, h5, .navbar-brand { 
+            font-family: 'Montserrat', sans-serif; 
+        }
+
+        /* Navbar y Marca */
+        .bg-tetra-dark { background-color: var(--tetra-dark) !important; }
+        .text-tetra-green { color: var(--tetra-green) !important; }
         
-        /* Colores de marca Tetracolor */
-        .bg-tetra-dark { background-color: #111111 !important; }
-        .text-tetra-green { color: #198754 !important; }
+        .navbar-custom {
+            border-bottom: 3px solid var(--tetra-green);
+        }
+
+        .navbar-brand-img {
+            height: 65px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .brand-text-logo {
+            font-size: 1.8rem;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            line-height: 1;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Enlaces de Navegación */
+        .nav-link-custom {
+            color: #e0e0e0;
+            font-weight: 700;
+            font-size: 0.95rem;
+            padding: 8px 14px !important;
+            transition: color 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        .nav-link-custom:hover, .nav-btn-hover:hover {
+            color: var(--tetra-green-bright) !important;
+        }
+
+        .dropdown-hover-item:hover {
+            background-color: #222222 !important;
+        }
+
+        /* Botones de Marca */
         .btn-tetra-green { background-color: #198754; color: white; border: none; }
         .btn-tetra-green:hover { background-color: #146c43; color: white; }
         .btn-tetra-red { background-color: #dc3545; color: white; border: none; }
         .btn-tetra-red:hover { background-color: #bb2d3b; color: white; }
         
-        /* Efectos */
-        .product-card { transition: transform 0.3s ease, box-shadow 0.3s ease; border: none; }
-        .product-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        .card-img-top { height: 250px; object-fit: cover; }
-        
-        /* Animación para los íconos de redes sociales */
         .hover-scale { transition: transform 0.2s ease; display: inline-block; }
         .hover-scale:hover { transform: scale(1.2); }
+
+        /* Estilos para Tarjetas de Producto y Efecto Hover */
+        .card-large-product {
+            border: none;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-large-product:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 14px 28px rgba(0,0,0,0.15);
+        }
+
+        .card-img-large-wrapper {
+            position: relative;
+            height: 340px;
+            overflow: hidden;
+            background-color: #2b2b2b;
+        }
+
+        .card-img-large-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .card-large-product:hover .card-img-large-wrapper img {
+            transform: scale(1.05);
+        }
+
+        .card-top-title-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 14px 18px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .card-desc-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(17, 17, 17, 0.92);
+            color: #ffffff;
+            padding: 55px 20px 20px 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.35s ease, visibility 0.35s ease;
+            z-index: 3;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .card-large-product:hover .card-desc-overlay {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .card-desc-overlay::-webkit-scrollbar { width: 5px; }
+        .card-desc-overlay::-webkit-scrollbar-thumb {
+            background: var(--tetra-green-bright);
+            border-radius: 4px;
+        }
+
+        .card-bottom-bar {
+            display: flex;
+            align-items: stretch;
+            min-height: 85px;
+            background-color: #ffffff;
+            flex-grow: 1;
+        }
+
+        .card-info-left {
+            flex: 1;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .card-info-left .brand-name { font-size: 0.75rem; font-weight: 800; color: #198754; text-transform: uppercase; margin-bottom: 2px; }
+        .card-info-left .product-name { font-size: 1.05rem; font-weight: 700; color: #111111; line-height: 1.25; margin-bottom: 0; }
+
+        .card-price-block {
+            background-color: var(--tetra-green-bright);
+            color: #0d3800;
+            padding: 14px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-end;
+            min-width: 150px;
+            text-decoration: none;
+            transition: background-color 0.2s ease;
+        }
+
+        .card-large-product:hover .card-price-block { background-color: #7ab332; }
+        .price-main { font-size: 1.45rem; font-weight: 900; line-height: 1; }
+        .price-sub { font-size: 0.7rem; font-weight: 700; opacity: 0.85; margin-top: 4px; text-transform: uppercase; }
+
+        /* Botón Flotante de WhatsApp */
+        .whatsapp-float {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            bottom: 40px;
+            right: 40px;
+            background-color: #25d366; 
+            color: #FFF;
+            border-radius: 50px;
+            text-align: center;
+            font-size: 30px;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: transform 0.3s ease;
+        }
+        
+        .whatsapp-float:hover { color: #FFF; transform: scale(1.1); }
+        @media (max-width: 768px) {
+            .whatsapp-float { width: 50px; height: 50px; bottom: 20px; right: 20px; font-size: 25px; }
+        }
     </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-tetra-dark py-3">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-tetra-dark py-2 navbar-custom shadow">
         <div class="container">
             
+            <!-- MARCA CON LOGO Y REDES SOCIALES COMPACTAS -->
             <div class="d-flex align-items-center me-4">
                 <a href="/" class="text-decoration-none">
-                    <img src="{{ url_for('static', filename='assets/logo/mi_logo.png') }}" alt="Logo" height="70" class="me-3">
+                    <img src="{{ url_for('static', filename='assets/logo/mi_logo.png') }}" alt="Logo" class="navbar-brand-img me-3">
                 </a>
                 
                 <div class="d-flex flex-column justify-content-center mt-1">
-                    <a class="navbar-brand fs-3 fw-bold mb-1 p-0 lh-1" href="/">
+                    <a class="navbar-brand brand-text-logo mb-1 p-0 lh-1" href="/">
                         <span class="text-white">TETRA</span><span class="text-tetra-green">COLOR</span>
                     </a>
                     <div class="d-flex gap-3">
@@ -55,42 +253,72 @@
             </button>
             
             <div class="collapse navbar-collapse" id="navbarContent">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0 mt-3 mt-lg-0">
-                    <li class="nav-item"><a class="nav-link text-uppercase fw-semibold" href="/">Catálogo</a></li>
+                
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 mt-3 mt-lg-0 align-items-center">
+                    <li class="nav-item"><a class="nav-link nav-link-custom" href="/">Catálogo</a></li>
                     
+                    <!-- MENÚ DESPLEGABLE DE GESTIÓN -->
                     {% if session.rol and session.rol != 'cliente' %}
-                        <li class="nav-item"><a class="nav-link" href="/pedidos">Pedidos</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/productos">Productos</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/clientes">Clientes</a></li>
-                        
-                        <li class="nav-item">
-                            <a class="nav-link fw-bold text-warning text-uppercase" href="/admin/seguridad">
-                                <i class="bi bi-shield-lock-fill"></i> SEGURIDAD
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle fw-bold text-white nav-btn-hover" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-grid-1x2-fill me-1"></i> Panel de Gestión
                             </a>
+                            <ul class="dropdown-menu dropdown-menu-dark shadow border-0" aria-labelledby="adminDropdown">
+                                <li>
+                                    <a class="dropdown-item dropdown-hover-item" href="/pedidos">
+                                        <i class="bi bi-box-seam me-2"></i> Gestión de Pedidos
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item dropdown-hover-item" href="/productos">
+                                        <i class="bi bi-tags me-2"></i> Inventario Productos
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item dropdown-hover-item" href="/clientes">
+                                        <i class="bi bi-people me-2"></i> Directorio Clientes
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider border-secondary"></li>
+                                <li>
+                                    <a class="dropdown-item dropdown-hover-item text-info fw-semibold" href="/admin/nuevo_usuario_sistema">
+                                        <i class="bi bi-person-plus-fill me-2"></i> + Nuevo Personal
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item dropdown-hover-item text-warning fw-semibold" href="/admin/seguridad">
+                                        <i class="bi bi-shield-lock-fill me-2"></i> Auditoría de Seguridad
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     {% endif %}
 
                     {% if session.rol == 'cliente' %}
                         <li class="nav-item">
-                            <a class="nav-link fw-bold text-success text-uppercase" href="/mis_pedidos"><i class="bi bi-box-seam"></i> MIS PEDIDOS</a>
+                            <a class="nav-link nav-link-custom text-success fw-bold" href="/mis_pedidos">
+                                <i class="bi bi-box-seam"></i> MIS PEDIDOS
+                            </a>
                         </li>
                     {% endif %}
                 </ul>
                 
-                <div class="d-flex text-white align-items-center mt-3 mt-lg-0">
+                <!-- SESIÓN DEL USUARIO -->
+                <div class="d-flex text-white align-items-center mt-3 mt-lg-0 gap-2">
                     {% if session.usuario_id %}
                         <span class="text-tetra-green fw-bold me-3">Hola, {{ session.nombre }}</span>
-                        <a class="btn btn-outline-light btn-sm me-2" href="/cambiar_clave">Clave</a>
-                        <a class="btn btn-tetra-red btn-sm" href="/logout">Salir</a>
+                        <a class="btn btn-outline-light btn-sm rounded-pill px-3" href="/cambiar_clave">Clave</a>
+                        <a class="btn btn-tetra-red btn-sm rounded-pill px-3" href="/logout">Salir</a>
                     {% else %}
-                        <a href="/login" class="btn btn-outline-light btn-sm me-2">Iniciar Sesión</a>
-                        <a href="/registro" class="btn btn-tetra-green btn-sm">Registrarse</a>
+                        <a href="/login" class="btn btn-outline-light btn-sm rounded-pill px-3">Iniciar Sesión</a>
+                        <a href="/registro" class="btn btn-tetra-green btn-sm rounded-pill px-3">Registrarse</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </nav>
     
+    <!-- MENSAJES FLASH -->
     <div class="container mt-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -104,10 +332,12 @@
         {% endwith %}
     </div>
     
-    <div class="container mt-4 mb-5">
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="container mt-4 mb-5 flex-grow-1">
         {% block content %}{% endblock %}
     </div>
     
+    <!-- FOOTER -->
     <footer class="bg-tetra-dark text-white py-5 mt-auto border-top border-secondary">
         <div class="container">
             <div class="row align-items-center">
@@ -146,6 +376,7 @@
         </div>
     </footer>   
 
+    <!-- BOTÓN FLOTANTE WHATSAPP -->
     <a href="https://wa.me/51932743842?text=Hola%20Tetracolor,%20quisiera%20hacer%20una%20consulta" 
        class="whatsapp-float" 
        target="_blank" 
@@ -153,44 +384,7 @@
         <i class="bi bi-whatsapp"></i>
     </a>
 
-    <style>
-        /* Estilos para el botón flotante */
-        .whatsapp-float {
-            position: fixed;
-            width: 60px;
-            height: 60px;
-            bottom: 40px;
-            right: 40px;
-            background-color: #25d366; 
-            color: #FFF;
-            border-radius: 50px;
-            text-align: center;
-            font-size: 30px;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none;
-            transition: transform 0.3s ease;
-        }
-        
-        .whatsapp-float:hover {
-            color: #FFF;
-            transform: scale(1.1);
-        }
-
-        @media (max-width: 768px) {
-            .whatsapp-float {
-                width: 50px;
-                height: 50px;
-                bottom: 20px;
-                right: 20px;
-                font-size: 25px;
-            }
-        }
-    </style>
-
+    <!-- JS Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -52,16 +52,68 @@
                             <input type="tel" class="form-control" id="telefono" name="telefono" placeholder="999 888 777" required>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="domicilio">Domicilio / Dirección completa</label>
-                        <input type="text" class="form-control" id="domicilio" name="domicilio" placeholder="Ej. Av. Los Pinos 123, Distrito" required>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Departamento</label>
+                            <select name="departamento" id="departamento" class="form-select bg-light" required>
+                                <option value="">Cargando...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Provincia</label>
+                            <select name="provincia" id="provincia" class="form-select bg-light" disabled required>
+                                <option value="">Seleccione Depto primero</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-secondary">Distrito</label>
+                            <select name="distrito" id="distrito" class="form-select bg-light" disabled required>
+                                <option value="">Seleccione Prov primero</option>
+                            </select>
+                        </div>
                     </div>
-                    
                     <div class="mb-3">
-                        <label class="fw-bold text-secondary">Contraseña</label>
-                        <input type="password" name="clave" class="form-control" required>
+                        <label class="form-label fw-bold text-secondary">Dirección Exacta</label>
+                        <input type="text" name="direccion" class="form-control" placeholder="Av. / Calle / Mz. Lote" required>
                     </div>
                     
+                    <!-- CONTRASEÑA Y CONFIRMACIÓN -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="fw-bold text-secondary">Contraseña</label>
+                            <div class="input-group">
+                                <input type="password" name="clave" id="clave" class="form-control" placeholder="••••••••" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="clave">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold text-secondary">Confirmar Contraseña</label>
+                            <div class="input-group">
+                                <input type="password" id="confirmar_clave" class="form-control" placeholder="••••••••" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="confirmar_clave">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <small id="error_clave" class="text-danger d-none fw-bold" style="font-size: 0.8em;">Las contraseñas no coinciden.</small>
+                        </div>
+                    </div>
+
+                    <!-- CAPTCHA MATEMÁTICO -->
+                    <div class="mb-4 p-3 bg-light border rounded">
+                        <label class="fw-bold text-secondary mb-2">Verificación de Seguridad</label>
+                        <div class="d-flex align-items-center">
+                            <span class="fs-5 me-2">¿Cuánto es </span>
+                            <span id="num1" class="fs-4 fw-bold text-success me-2"></span>
+                            <span class="fs-5 me-2"> + </span>
+                            <span id="num2" class="fs-4 fw-bold text-success me-2"></span>
+                            <span class="fs-5 me-2"> ? </span>
+                            <input type="number" id="captcha_input" class="form-control w-25" placeholder="Resultado" required>
+                        </div>
+                        <small id="error_captcha" class="text-danger d-none fw-bold mt-1" style="font-size: 0.8em;">Respuesta incorrecta. Intenta de nuevo.</small>
+                    </div>
+                                        
                     <button type="submit" class="btn btn-success w-100 py-2 fw-bold">Registrarme</button>
                 </form>
             </div>
@@ -117,6 +169,166 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+    }
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    const depSelect = document.getElementById("departamento");
+    const provSelect = document.getElementById("provincia");
+    const distSelect = document.getElementById("distrito");
+
+    // 1. CARGAR DEPARTAMENTOS DESDE TU PROPIO SERVIDOR FLASK
+    try {
+        if (depSelect) {
+            depSelect.innerHTML = '<option value="">Cargando departamentos...</option>';
+            const res = await fetch('/api/departamentos');
+            const departamentos = await res.json();
+            
+            depSelect.innerHTML = '<option value="">Seleccione Departamento</option>';
+            departamentos.forEach(dep => {
+                depSelect.innerHTML += `<option value="${dep.id}">${dep.nombre}</option>`;
+            });
+        }
+    } catch (error) {
+        console.error("Error conectando a tu servidor local:", error);
+        if (depSelect) depSelect.innerHTML = '<option value="">Error de servidor local</option>';
+    }
+
+    // 2. FILTRAR PROVINCIAS
+    if (depSelect && provSelect && distSelect) {
+        depSelect.addEventListener("change", async function() {
+            const idDep = this.value; 
+            provSelect.innerHTML = '<option value="">Cargando...</option>';
+            distSelect.innerHTML = '<option value="">Seleccione Prov primero</option>';
+            provSelect.disabled = true;
+            distSelect.disabled = true;
+
+            if (!idDep) {
+                provSelect.innerHTML = '<option value="">Seleccione Provincia</option>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/provincias/${idDep}`);
+                const provincias = await res.json();
+                
+                provSelect.innerHTML = '<option value="">Seleccione Provincia</option>';
+                provincias.forEach(prov => {
+                    provSelect.innerHTML += `<option value="${prov.id}">${prov.nombre}</option>`;
+                });
+                provSelect.disabled = provincias.length === 0;
+            } catch (error) {
+                console.error("Error al cargar provincias:", error);
+            }
+        });
+    }
+
+    // 3. FILTRAR DISTRITOS
+    if (provSelect && distSelect) {
+        provSelect.addEventListener("change", async function() {
+            const idProv = this.value; 
+            distSelect.innerHTML = '<option value="">Cargando...</option>';
+            distSelect.disabled = true;
+
+            if (!idProv) {
+                distSelect.innerHTML = '<option value="">Seleccione Distrito</option>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/distritos/${idProv}`);
+                const distritos = await res.json();
+                
+                distSelect.innerHTML = '<option value="">Seleccione Distrito</option>';
+                distritos.forEach(dist => {
+                    distSelect.innerHTML += `<option value="${dist.id}">${dist.nombre}</option>`;
+                });
+                distSelect.disabled = distritos.length === 0;
+            } catch (error) {
+                console.error("Error al cargar distritos:", error);
+            }
+        });
+    }
+
+    // ==========================================
+    // SISTEMA DE CONTRASEÑAS, CAPTCHA Y VALIDACIÓN
+    // ==========================================
+    const toggleButtons = document.querySelectorAll(".toggle-password");
+    toggleButtons.forEach(btn => {
+        btn.addEventListener("click", function() {
+            const targetId = this.getAttribute("data-target");
+            const input = document.getElementById(targetId);
+            const icon = this.querySelector("i");
+            if (input && input.type === "password") {
+                input.type = "text";
+                icon.classList.remove("bi-eye");
+                icon.classList.add("bi-eye-slash");
+            } else if (input) {
+                input.type = "password";
+                icon.classList.remove("bi-eye-slash");
+                icon.classList.add("bi-eye");
+            }
+        });
+    });
+
+    const spanNum1 = document.getElementById("num1");
+    const spanNum2 = document.getElementById("num2");
+    let n1 = Math.floor(Math.random() * 10) + 1;
+    let n2 = Math.floor(Math.random() * 10) + 1;
+    let captchaCorrecto = n1 + n2;
+
+    if (spanNum1 && spanNum2) {
+        spanNum1.textContent = n1;
+        spanNum2.textContent = n2;
+    }
+
+    const form = document.querySelector("form");
+    if (form) {
+        form.addEventListener("submit", function(event) {
+            let valid = true;
+
+            const claveInput = document.getElementById("clave");
+            const confirmarClaveInput = document.getElementById("confirmar_clave");
+            const errorClave = document.getElementById("error_clave");
+            
+            if (claveInput && confirmarClaveInput && errorClave) {
+                if (claveInput.value !== confirmarClaveInput.value) {
+                    errorClave.classList.remove("d-none");
+                    valid = false;
+                } else {
+                    errorClave.classList.add("d-none");
+                }
+            }
+
+            const inputCaptcha = document.getElementById("captcha_input");
+            const errorCaptcha = document.getElementById("error_captcha");
+            
+            if (inputCaptcha && errorCaptcha) {
+                if (parseInt(inputCaptcha.value) !== captchaCorrecto) {
+                    errorCaptcha.classList.remove("d-none");
+                    n1 = Math.floor(Math.random() * 10) + 1;
+                    n2 = Math.floor(Math.random() * 10) + 1;
+                    captchaCorrecto = n1 + n2;
+                    spanNum1.textContent = n1;
+                    spanNum2.textContent = n2;
+                    inputCaptcha.value = "";
+                    valid = false;
+                } else {
+                    errorCaptcha.classList.add("d-none");
+                }
+            }
+
+            if (!valid) {
+                event.preventDefault();
+                return;
+            }
+
+            // IMPORTANTE: Transformar IDs a Texto antes de guardar (para guardar "Lima" y no "15")
+            if(depSelect && depSelect.value) depSelect.options[depSelect.selectedIndex].value = depSelect.options[depSelect.selectedIndex].text;
+            if(provSelect && provSelect.value) provSelect.options[provSelect.selectedIndex].value = provSelect.options[provSelect.selectedIndex].text;
+            if(distSelect && distSelect.value) distSelect.options[distSelect.selectedIndex].value = distSelect.options[distSelect.selectedIndex].text;
+        });
     }
 });
 </script>

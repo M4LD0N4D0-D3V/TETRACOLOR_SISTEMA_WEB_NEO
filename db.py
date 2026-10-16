@@ -1,6 +1,11 @@
 import psycopg2
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+import os
+from dotenv import load_dotenv
+
+# Cargar variables
+load_dotenv()
 
 db = SQLAlchemy()
 
@@ -175,5 +180,5 @@ class RegistroSeguridad(db.Model):
 
 
 def get_connection(): 
-    URI_SUPABASE = "postgresql://postgres.byixvuagnonvxjhhsnkn:SCARFSKYLA21@aws-1-us-west-2.pooler.supabase.com:6543/postgres"
+    URI_SUPABASE = os.getenv("DATABASE_URL")
     return psycopg2.connect(URI_SUPABASE)
