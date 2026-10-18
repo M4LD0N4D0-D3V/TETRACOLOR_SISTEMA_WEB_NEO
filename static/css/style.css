@@ -1,0 +1,111 @@
+/* =========================================
+   TETRACOLOR - ESTILOS GLOBALES Y DE AUTENTICACIÓN
+   ========================================= */
+
+/* Estilos base para las pantallas de autenticación (Pantalla Dividida) */
+.auth-wrapper {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-card {
+    border: none;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 900px;
+    width: 100%;
+    background: #fff;
+}
+
+/* Lado izquierdo - Gráfico */
+.auth-side {
+    background: linear-gradient(135deg, var(--tetra-dark) 0%, var(--tetra-green) 100%);
+    color: white;
+    padding: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.auth-side-admin {
+    background: linear-gradient(135deg, #1a1a1a 0%, #8b0000 100%);
+    color: white;
+    padding: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+/* Lado derecho - Formulario */
+.auth-form-wrap {
+    padding: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+}
+
+/* Inputs personalizados */
+.custom-input {
+    border-radius: 10px;
+    border: 1.5px solid #e0e0e0;
+    padding: 14px 18px;
+    font-size: 1rem;
+    transition: all 0.3s;
+    background-color: #fcfcfc;
+}
+
+.custom-input:focus {
+    background-color: #fff;
+}
+
+.custom-input.client:focus {
+    border-color: var(--tetra-green);
+    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+}
+
+.custom-input.admin:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.15);
+}
+
+/* Botones de acción */
+.btn-auth {
+    border-radius: 10px;
+    padding: 14px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+    transition: transform 0.2s;
+}
+
+.btn-auth:hover {
+    transform: translateY(-2px);
+}
+
+.btn-auth-admin {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+    transition: transform 0.2s;
+}
+
+.btn-auth-admin:hover {
+    background-color: #bb2d3b;
+    color: white;
+    transform: translateY(-2px);
+}

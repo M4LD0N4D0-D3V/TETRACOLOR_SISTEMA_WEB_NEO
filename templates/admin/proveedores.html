@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between mb-3">
+        <h2>Gestión de Proveedores</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProveedor">Nuevo Proveedor</button>
+    </div>
+    <table class="table table-striped shadow-sm">
+        <thead class="table-dark">
+            <tr>
+                <th>RUC</th>
+                <th>Razón Social</th>
+                <th>Contacto</th>
+                <th>Teléfono</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prov in proveedores %}
+            <tr>
+                <td>{{ prov.ruc }}</td>
+                <td>{{ prov.razon_social }}</td>
+                <td>{{ prov.contacto }}</td>
+                <td>{{ prov.telefono }}</td>
+                <td><span class="badge bg-success">{{ prov.estado }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Nuevo Proveedor -->
+<div class="modal fade" id="modalProveedor" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="/admin/proveedores" method="POST" class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Registrar Proveedor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" name="ruc" class="form-control mb-2" placeholder="RUC (11 dígitos)" required>
+                <input type="text" name="razon_social" class="form-control mb-2" placeholder="Razón Social" required>
+                <input type="text" name="contacto" class="form-control mb-2" placeholder="Nombre de Contacto">
+                <input type="text" name="telefono" class="form-control mb-2" placeholder="Teléfono">
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

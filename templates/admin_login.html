@@ -1,24 +1,35 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <div class="card shadow border-danger mt-4">
-            <div class="card-header bg-danger text-white text-center">
-                <h4>Acceso Administrativo</h4>
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <!-- Lado Gráfico / Seguridad -->
+        <div class="col-md-5 auth-side-admin d-none d-md-flex">
+            <i class="bi bi-shield-lock-fill text-white mb-3" style="font-size: 4rem; opacity: 0.9;"></i>
+            <h2 class="fw-bold mb-3">Portal de Gestión</h2>
+            <p class="opacity-75 mb-0">Área restringida exclusiva para el personal autorizado de TetraColor.</p>
+        </div>
+        
+        <!-- Lado del Formulario -->
+        <div class="col-md-7 auth-form-wrap">
+            <!-- BOTÓN PARA REGRESAR -->
+            <div class="position-absolute" style="top: 20px; right: 30px;">
+                <a href="/login" class="text-muted text-decoration-none small fw-bold"><i class="bi bi-arrow-left me-1"></i> Volver a Clientes</a>
             </div>
-            <div class="card-body p-4">
-                <form action="/admin/login" method="POST">
-                    <div class="mb-3">
-                        <label>Correo Corporativo</label>
-                        <input type="email" name="correo" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label>Contraseña</label>
-                        <input type="password" name="clave" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-danger w-100">Ingresar al Panel</button>
-                </form>
-            </div>
+
+            <h3 class="fw-bold mb-1 mt-3" style="color: var(--tetra-dark);">Acceso Administrativo</h3>
+            <p class="text-muted mb-4 small">Ingresa tus credenciales corporativas.</p>
+            
+            <form action="/admin/login" method="POST">
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-secondary small text-uppercase">Correo Corporativo</label>
+                    <input type="email" name="correo" class="form-control custom-input admin" placeholder="admin@tetracolor.com" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-secondary small text-uppercase">Contraseña</label>
+                    <input type="password" name="clave" class="form-control custom-input admin" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-auth-admin w-100 mt-2"><i class="bi bi-box-arrow-in-right me-2"></i> INGRESAR AL PANEL</button>
+            </form>
         </div>
     </div>
 </div>

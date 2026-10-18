@@ -1,26 +1,35 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <div class="card shadow mt-4">
-            <div class="card-header bg-dark text-white text-center">
-                <h4>Iniciar Sesión</h4>
-            </div>
-            <div class="card-body p-4">
-                <form action="/login" method="POST">
-                    <div class="mb-3">
-                        <label>Correo Electrónico</label>
-                        <input type="email" name="correo" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label>Contraseña</label>
-                        <input type="password" name="clave" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Ingresar</button>
-                </form>
-                <div class="text-center mt-3">
-                    <a href="/admin/login" class="text-muted small">¿Eres parte del equipo? Ingresa aquí.</a>
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <!-- Lado Gráfico / Marca -->
+        <div class="col-md-5 auth-side d-none d-md-flex">
+            <h2 class="fw-bold mb-3">Bienvenido de nuevo</h2>
+            <p class="opacity-75 mb-4">Ingresa a tu cuenta para cotizar, hacer seguimiento a tus pedidos y descubrir nuestros nuevos servicios.</p>
+            <img src="{{ url_for('static', filename='assets/logo/mi_logo.png') }}" alt="Logo" style="width: 120px; opacity: 0.9;">
+        </div>
+        
+        <!-- Lado del Formulario -->
+        <div class="col-md-7 auth-form-wrap">
+            <h3 class="fw-bold mb-1" style="color: var(--tetra-dark);">Iniciar Sesión</h3>
+            <p class="text-muted mb-4 small">Por favor, ingresa tus credenciales.</p>
+            
+            <form action="/login" method="POST">
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-secondary small text-uppercase">Correo Electrónico</label>
+                    <input type="email" name="correo" class="form-control custom-input client" placeholder="ejemplo@correo.com" required>
                 </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-secondary small text-uppercase">Contraseña</label>
+                    <input type="password" name="clave" class="form-control custom-input client" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-success btn-auth w-100 mt-2">INGRESAR A MI CUENTA</button>
+            </form>
+            
+            <div class="text-center mt-4">
+                <p class="text-muted mb-2">¿No tienes una cuenta? <a href="/registro" class="text-success fw-bold text-decoration-none">Regístrate aquí</a></p>
+                <hr class="my-4 opacity-25">
+                <a href="/admin/login" class="text-muted small text-decoration-none hover-scale"><i class="bi bi-shield-lock me-1"></i> Acceso para personal de la empresa</a>
             </div>
         </div>
     </div>

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold"><i class="bi bi-boxes"></i> Inventario de Materiales</h2>
+        <button class="btn btn-success fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalInsumo">
+            <i class="bi bi-plus-circle"></i> Nuevo Insumo
+        </button>
+    </div>
+
+    <!-- TABLA DE INVENTARIO -->
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="ps-4">Insumo</th>
+                            <th>Stock Actual</th>
+                            <th>Unidad</th>
+                            <th>Stock Mínimo</th>
+                            <th>Categoría</th>
+                            <th class="text-center pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for insumo in insumos %}
+                        <tr class="{% if insumo.stock_actual <= insumo.stock_minimo %}table-warning{% endif %}">
+                            <td class="ps-4 fw-bold">{{ insumo.nombre_insumo }}</td>
+                            <td class="fs-6 {% if insumo.stock_actual <= insumo.stock_minimo %}text-danger fw-bold{% else %}text-success fw-bold{% endif %}">
+                                {{ insumo.stock_actual }}
+                            </td>
+                            <td class="text-muted">{{ insumo.unidad_medida }}</td>
+                            <td>{{ insumo.stock_minimo }}</td>
+                            <td>
+                                <span class="badge bg-secondary rounded-pill">
+                                    {{ insumo.categoria or 'General' }}
+                                </span>
+                            </td>
+                            <td class="text-center pe-4">
+                                <button class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalMovimiento{{ insumo.id }}">
+                                    <i class="bi bi-arrow-down-up"></i> Registrar Ingreso/Salida
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i> No hay insumos registrados en el inventario.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALES DE MOVIMIENTO (UBICADOS FUERA DE LA TABLA) -->
+{% for insumo in insumos %}
+<div class="modal fade" id="modalMovimiento{{ insumo.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 shadow border-0">
+            <div class="modal-header bg-dark text-white rounded-top-4">
+                <h5 class="modal-title fs-6"><i class="bi bi-arrow-down-up me-2"></i>Movimiento: {{ insumo.nombre_insumo }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/admin/inventario/movimiento" method="POST">
+                <div class="modal-body bg-light">
+                    <input type="hidden" name="id_insumo" value="{{ insumo.id }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Tipo de Movimiento</label>
+                        <select name="tipo_movimiento" class="form-select fw-bold" required>
+                            <option value="Ingreso">Ingreso (+ Agregar a Stock)</option>
+                            <option value="Salida">Salida (- Descontar de Stock)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Cantidad</label>
+                        <input type="number" step="0.01" min="0.01" name="cantidad" class="form-control" placeholder="Ej. 5.00" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Motivo / Detalle</label>
+                        <input type="text" name="motivo" class="form-control" placeholder="Ej: Compra de lote, Merma, Producción" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Proveedor (Opcional)</label>
+                        <select name="id_proveedor" class="form-select">
+                            <option value="">-- Sin Proveedor / No aplica --</option>
+                            {% for prov in proveedores %}
+                            <option value="{{ prov.id }}">{{ prov.razon_social }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 rounded-bottom-4">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4"><i class="bi bi-check-lg"></i> Procesar Movimiento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- MODAL REGISTRAR NUEVO INSUMO -->
+<div class="modal fade" id="modalInsumo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 shadow border-0">
+            <div class="modal-header bg-success text-white rounded-top-4">
+                <h5 class="modal-title fs-6"><i class="bi bi-plus-circle me-2"></i>Registrar Nuevo Material</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="/admin/inventario" method="POST">
+                <div class="modal-body bg-light">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Nombre del Insumo / Material</label>
+                        <input type="text" name="nombre_insumo" class="form-control" placeholder="Ej: Tinta Plastisol Blanca" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Categoría</label>
+                        <select name="categoria" class="form-select" required>
+                            <option value="Textiles">Textiles (Polos, Gorras, etc.)</option>
+                            <option value="Tintas y Químicos">Tintas y Químicos</option>
+                            <option value="Viniles y Acabados">Viniles y Acabados</option>
+                            <option value="General" selected>General</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Unidad de Medida</label>
+                        <input type="text" name="unidad_medida" class="form-control" placeholder="Ej: Litros, Metros, Unidades" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Stock Mínimo (Alerta)</label>
+                        <input type="number" step="0.01" min="0" name="stock_minimo" class="form-control" value="0.00" required>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 rounded-bottom-4">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4"><i class="bi bi-save"></i> Guardar Material</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

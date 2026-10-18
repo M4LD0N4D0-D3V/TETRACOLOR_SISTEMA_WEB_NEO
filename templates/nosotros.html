@@ -1,16 +1,55 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
-    <div class="row align-items-center">
-        <div class="col-md-6">
-            <h1>Acerca de Tetracolor</h1>
-            <p class="lead">Somos líderes en soluciones de impresión y diseño gráfico.</p>
-            <p>En Tetracolor, nos especializamos en transformar tus ideas en productos visuales de alta calidad. Con años de experiencia en el mercado, ofrecemos servicios de gigantografías, viniles, material publicitario y merchandising.</p>
-            <p><strong>Nuestra Misión:</strong> Brindar resultados vibrantes y precisos que potencien la marca de nuestros clientes, garantizando tiempos de entrega eficientes y atención personalizada.</p>
+
+<!-- Hero Section Nosotros -->
+<div class="position-relative bg-dark text-white overflow-hidden mb-5 shadow-lg rounded-4">
+    <!-- Si tienes una imagen del local ancha, ponla aquí, sino usa el mismo fondo oscuro -->
+    <div class="position-absolute top-0 start-0 w-100 h-100 bg-tetra-dark opacity-75"></div>
+    <div class="position-relative d-flex flex-column justify-content-center align-items-center text-center p-5" style="min-height: 250px;">
+        <h1 class="display-4 fw-bold text-success text-shadow mb-2">Acerca de TETRACOLOR</h1>
+        <p class="lead fs-5 text-light">Líderes en soluciones de impresión y diseño gráfico en Huancayo.</p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    <div class="row align-items-center g-5">
+        <div class="col-lg-6">
+            <h2 class="fw-bold mb-4" style="color: var(--tetra-dark);">Transformamos tus ideas en <span class="text-success">resultados visuales</span></h2>
+            
+            <p class="fs-5 text-muted mb-4">En Tetracolor, nos especializamos en materializar tus proyectos gráficos con la más alta calidad del mercado. Con años de experiencia, ofrecemos servicios de estampados, gigantografías, viniles, material publicitario y merchandising.</p>
+            
+            <div class="card border-0 bg-light shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4 border-start border-success border-4 rounded-4">
+                    <h5 class="fw-bold"><i class="bi bi-bullseye text-success me-2"></i>Nuestra Misión</h5>
+                    <p class="mb-0 text-secondary">Brindar resultados vibrantes y precisos que potencien la marca de nuestros clientes, garantizando tiempos de entrega eficientes y una atención completamente personalizada.</p>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3">
+                <a href="/#catalogo" class="btn btn-success fw-bold rounded-pill px-4 py-2 shadow-sm">Ver Servicios</a>
+                <a href="/#ubicacion" class="btn btn-outline-dark fw-bold rounded-pill px-4 py-2">Visítanos</a>
+            </div>
         </div>
-        <div class="col-md-6">
-            <!-- Reemplaza con una imagen real de tu local o logo -->
-            <img src="{{ url_for('static', filename='img/tetracolor_fachada.jpg') }}" class="img-fluid rounded shadow" alt="Instalaciones Tetracolor">
+        
+        <div class="col-lg-6">
+            <div class="position-relative">
+                <!-- Marco decorativo verde detrás de la imagen -->
+                <div class="position-absolute rounded-4 bg-success" style="top: 20px; left: -20px; width: 100%; height: 100%; z-index: 0; opacity: 0.2;"></div>
+                
+                <!-- Reemplaza la ruta de la imagen con la foto real de tu fachada o taller -->
+                <img src="{{ url_for('static', filename='assets/logo/bann.jpg') }}" class="img-fluid rounded-4 shadow-lg position-relative" style="z-index: 1; object-fit: cover; height: 450px; width: 100%;" alt="Instalaciones Tetracolor">
+                
+                <!-- Badge flotante -->
+                <div class="position-absolute bg-white shadow rounded-4 p-3 d-flex align-items-center gap-3" style="bottom: 30px; left: -30px; z-index: 2;">
+                    <div class="bg-success text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 50px; height: 50px;">
+                        <i class="bi bi-star-fill fs-5"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Calidad Premium</h6>
+                        <small class="text-muted">Acabados garantizados</small>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

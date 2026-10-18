@@ -1,169 +1,189 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow mt-4">
-            <div class="card-header bg-success text-white text-center">
-                <h4>Crea tu cuenta</h4>
-            </div>
-            <div class="card-body p-4">
-                <form action="/registro" method="POST" id="formRegistro">
-                    
-                    <!-- Incluye el selector de tipo_doc y el input de documento -->
-                    {% include 'consulta_api.html' %}
+<div class="auth-wrapper">
+    <div class="auth-card" style="max-width: 1100px;">
+        <!-- Lado Gráfico / Marca -->
+        <div class="col-md-4 auth-side d-none d-md-flex">
+            <h2 class="fw-bold mb-3">Únete a TetraColor</h2>
+            <p class="opacity-75 mb-4">Crea tu cuenta para acceder a cotizaciones rápidas, seguimiento detallado de tus proyectos y atención personalizada.</p>
+            <ul class="text-start opacity-75 small mb-4" style="list-style: none; padding-left: 0;">
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-white me-2"></i> Gestión ágil de pedidos</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-white me-2"></i> Historial de facturación</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-white me-2"></i> Soporte prioritario</li>
+            </ul>
+            <img src="{{ url_for('static', filename='assets/logo/mi_logo.png') }}" alt="Logo" style="width: 100px; opacity: 0.9; margin-top: auto;">
+        </div>
+        
+        <!-- Lado del Formulario -->
+        <div class="col-md-8 auth-form-wrap">
+            <h3 class="fw-bold mb-1" style="color: var(--tetra-dark);">Crea tu cuenta</h3>
+            <p class="text-muted mb-4 small">Completa tus datos para registrarte en nuestro sistema.</p>
+            
+            <form action="/registro" method="POST" id="formRegistro">
+                
+                <!-- Incluye el selector de tipo_doc y el input de documento -->
+                {% include 'consulta_api.html' %}
 
-                    <!-- Campos para Persona Natural (DNI, CE, Pasaporte, Otro) -->
-                    <div id="campos_dni">
-                        <div class="mb-3">
-                            <label class="fw-bold text-secondary">Nombres</label>
-                            <input type="text" name="nombres" id="nombres" class="form-control bg-light" required readonly>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-6">
-                                <label class="fw-bold text-secondary">A. Paterno</label>
-                                <input type="text" name="apellido_paterno" id="apellido_paterno" class="form-control bg-light" required readonly>
-                            </div>
-                            <div class="col-6">
-                                <label class="fw-bold text-secondary">A. Materno</label>
-                                <input type="text" name="apellido_materno" id="apellido_materno" class="form-control bg-light" required readonly>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Campos para Empresa (RUC) -->
-                    <div id="campos_ruc" style="display: none;">
-                        <div class="mb-3">
-                            <label class="fw-bold text-secondary">Razón Social</label>
-                            <input type="text" name="razon_social" id="razon_social" class="form-control bg-light" readonly>
-                        </div>
-                    </div>
-                    
-                    <hr class="my-4">
-
+                <!-- Campos para Persona Natural (DNI, CE, Pasaporte, Otro) -->
+                <div id="campos_dni">
                     <div class="mb-3">
-                        <label class="fw-bold text-secondary">Correo Electrónico</label>
-                        <input type="email" name="correo" class="form-control" placeholder="ejemplo@correo.com" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="telefono" class="fw-bold text-secondary">Teléfono / Celular</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light">+51</span>
-                            <input type="tel" class="form-control" id="telefono" name="telefono" placeholder="999 888 777" required>
-                        </div>
+                        <label class="form-label fw-semibold text-secondary small text-uppercase">Nombres</label>
+                        <input type="text" name="nombres" id="nombres" class="form-control custom-input client bg-light" required readonly>
                     </div>
                     <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Apellido Paterno</label>
+                            <input type="text" name="apellido_paterno" id="apellido_paterno" class="form-control custom-input client bg-light" required readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Apellido Materno</label>
+                            <input type="text" name="apellido_materno" id="apellido_materno" class="form-control custom-input client bg-light" required readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos para Empresa (RUC) -->
+                <div id="campos_ruc" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small text-uppercase">Razón Social</label>
+                        <input type="text" name="razon_social" id="razon_social" class="form-control custom-input client bg-light" readonly>
+                    </div>
+                </div>
+                
+                <hr class="my-4 opacity-25">
+
+                <!-- BLOQUES VISUALES AGRUPADOS (Sin ocultar info) -->
+                
+                <!-- BLOQUE 1: Contacto -->
+                <div class="p-3 mb-3 bg-light border rounded-3">
+                    <h6 class="fw-bold text-success mb-3 border-bottom pb-2"><i class="bi bi-envelope-at me-2"></i>Datos de Contacto</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Correo Electrónico</label>
+                            <input type="email" name="correo" class="form-control custom-input client bg-white" placeholder="ejemplo@correo.com" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="telefono" class="form-label fw-semibold text-secondary small text-uppercase">Teléfono / Celular</label>
+                            <div class="input-group">
+                                <span class="input-group-text custom-prepend bg-white border-end-0 text-muted">+51</span>
+                                <input type="tel" class="form-control custom-input client bg-white border-start-0 ps-0" id="telefono" name="telefono" placeholder="999 888 777" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BLOQUE 2: Ubicación -->
+                <div class="p-3 mb-4 bg-light border rounded-3">
+                    <h6 class="fw-bold text-success mb-3 border-bottom pb-2"><i class="bi bi-geo-alt me-2"></i>Dirección de Envío</h6>
+                    <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label fw-bold text-secondary">Departamento</label>
-                            <select name="departamento" id="departamento" class="form-select bg-light" required>
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Departamento</label>
+                            <select name="departamento" id="departamento" class="form-select custom-select bg-white" required>
                                 <option value="">Cargando...</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold text-secondary">Provincia</label>
-                            <select name="provincia" id="provincia" class="form-select bg-light" disabled required>
-                                <option value="">Seleccione Depto primero</option>
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Provincia</label>
+                            <select name="provincia" id="provincia" class="form-select custom-select bg-white" disabled required>
+                                <option value="">Seleccione...</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold text-secondary">Distrito</label>
-                            <select name="distrito" id="distrito" class="form-select bg-light" disabled required>
-                                <option value="">Seleccione Prov primero</option>
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Distrito</label>
+                            <select name="distrito" id="distrito" class="form-select custom-select bg-white" disabled required>
+                                <option value="">Seleccione...</option>
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-secondary">Dirección Exacta</label>
-                        <input type="text" name="direccion" class="form-control" placeholder="Av. / Calle / Mz. Lote" required>
+                    <div>
+                        <label class="form-label fw-semibold text-secondary small text-uppercase">Dirección Exacta</label>
+                        <input type="text" name="direccion" class="form-control custom-input client bg-white" placeholder="Av. / Calle / Mz. Lote" required>
                     </div>
-                    
-                    <!-- CONTRASEÑA Y CONFIRMACIÓN -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="fw-bold text-secondary">Contraseña</label>
-                            <div class="input-group">
-                                <input type="password" name="clave" id="clave" class="form-control" placeholder="••••••••" required>
-                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="clave">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="fw-bold text-secondary">Confirmar Contraseña</label>
-                            <div class="input-group">
-                                <input type="password" id="confirmar_clave" class="form-control" placeholder="••••••••" required>
-                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="confirmar_clave">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                            </div>
-                            <small id="error_clave" class="text-danger d-none fw-bold" style="font-size: 0.8em;">Las contraseñas no coinciden.</small>
+                </div>
+                
+                <!-- CONTRASEÑA Y CONFIRMACIÓN -->
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label fw-semibold text-secondary small text-uppercase">Contraseña</label>
+                        <div class="input-group">
+                            <input type="password" name="clave" id="clave" class="form-control custom-input client custom-input-group" style="border-right: none;" placeholder="••••••••" required>
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="clave" style="border-radius: 0 10px 10px 0; border: 1.5px solid #e0e0e0; border-left: none;">
+                                <i class="bi bi-eye"></i>
+                            </button>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary small text-uppercase">Confirmar Contraseña</label>
+                        <div class="input-group">
+                            <input type="password" id="confirmar_clave" class="form-control custom-input client custom-input-group" style="border-right: none;" placeholder="••••••••" required>
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="confirmar_clave" style="border-radius: 0 10px 10px 0; border: 1.5px solid #e0e0e0; border-left: none;">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <small id="error_clave" class="text-danger d-none fw-bold mt-1" style="font-size: 0.8em;">Las contraseñas no coinciden.</small>
+                    </div>
+                </div>
 
-                    <!-- CAPTCHA MATEMÁTICO -->
-                    <div class="mb-4 p-3 bg-light border rounded">
-                        <label class="fw-bold text-secondary mb-2">Verificación de Seguridad</label>
-                        <div class="d-flex align-items-center">
-                            <span class="fs-5 me-2">¿Cuánto es </span>
-                            <span id="num1" class="fs-4 fw-bold text-success me-2"></span>
-                            <span class="fs-5 me-2"> + </span>
-                            <span id="num2" class="fs-4 fw-bold text-success me-2"></span>
-                            <span class="fs-5 me-2"> ? </span>
-                            <input type="number" id="captcha_input" class="form-control w-25" placeholder="Resultado" required>
-                        </div>
-                        <small id="error_captcha" class="text-danger d-none fw-bold mt-1" style="font-size: 0.8em;">Respuesta incorrecta. Intenta de nuevo.</small>
+                <!-- CAPTCHA MATEMÁTICO (VERSIÓN COMPACTA) -->
+                <div class="mb-4 p-3 bg-light border rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                        <span class="fw-semibold text-secondary small text-uppercase d-block mb-1"><i class="bi bi-shield-lock-fill text-warning me-1"></i> Seguridad</span>
+                        <span class="text-muted small">Resuelve la suma para continuar:</span>
                     </div>
-                                        
-                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold">Registrarme</button>
-                </form>
+                    <div class="d-flex align-items-center bg-white px-3 py-2 rounded-3 border">
+                        <span id="num1" class="fs-5 fw-bold text-dark"></span>
+                        <span class="fs-5 mx-2 text-muted">+</span>
+                        <span id="num2" class="fs-5 fw-bold text-dark"></span>
+                        <span class="fs-5 ms-2 me-3 text-muted">=</span>
+                        <input type="number" id="captcha_input" class="form-control form-control-sm text-center fw-bold text-success border-success" style="width: 70px; font-size: 1.1rem;" required>
+                    </div>
+                </div>
+                <small id="error_captcha" class="text-danger d-none fw-bold mb-3 d-block" style="font-size: 0.85em; margin-top: -15px;">La respuesta matemática es incorrecta.</small>
+                                    
+                <button type="submit" class="btn btn-success btn-auth w-100 py-3 mt-2">COMPLETAR REGISTRO</button>
+            </form>
+
+            <div class="text-center mt-4">
+                <p class="text-muted mb-0 small">¿Ya tienes una cuenta? <a href="/login" class="text-success fw-bold text-decoration-none">Inicia sesión aquí</a></p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Lógica JavaScript para controlar dinámica de campos según tipo de documento -->
+<!-- Lógica JavaScript (Mantenida idéntica) -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Buscamos el selector que está dentro de 'consulta_api.html'
     const selectTipoDoc = document.getElementById('tipo_doc') || document.querySelector('select[name="tipo_doc"]');
     
     if (selectTipoDoc) {
         selectTipoDoc.addEventListener('change', actualizarFormulario);
-        actualizarFormulario(); // Ejecución inicial
+        actualizarFormulario();
     }
 
     function actualizarFormulario() {
         const valorTipo = selectTipoDoc ? selectTipoDoc.value.toLowerCase() : 'dni';
-        
         const divDni = document.getElementById('campos_dni');
         const divRuc = document.getElementById('campos_ruc');
         const inputsDni = divDni.querySelectorAll('input');
         const inputRuc = document.getElementById('razon_social');
 
         if (valorTipo === 'ruc') {
-            // Caso RUC: Muestra Razón Social y deshabilita requeridos de DNI
             divDni.style.display = 'none';
             divRuc.style.display = 'block';
-            
             inputsDni.forEach(i => i.removeAttribute('required'));
             if (inputRuc) inputRuc.setAttribute('required', 'required');
-
         } else {
-            // Caso Persona Natural (DNI, CE, Pasaporte, Otro)
             divDni.style.display = 'block';
             divRuc.style.display = 'none';
-            
             inputsDni.forEach(i => i.setAttribute('required', 'required'));
             if (inputRuc) inputRuc.removeAttribute('required');
 
-            // Si es un documento internacional/manual, quitamos 'readonly' para que puedan escribir
             const esManual = (valorTipo === 'ce' || valorTipo === 'pasaporte' || valorTipo === 'otro');
             inputsDni.forEach(i => {
                 if (esManual) {
                     i.removeAttribute('readonly');
                     i.classList.remove('bg-light');
                 } else {
-                    // Si es DNI vuelve a ser readonly (llenado automático por la API)
                     i.setAttribute('readonly', 'readonly');
                     i.classList.add('bg-light');
                 }
@@ -178,7 +198,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     const provSelect = document.getElementById("provincia");
     const distSelect = document.getElementById("distrito");
 
-    // 1. CARGAR DEPARTAMENTOS DESDE TU PROPIO SERVIDOR FLASK
     try {
         if (depSelect) {
             depSelect.innerHTML = '<option value="">Cargando departamentos...</option>';
@@ -195,7 +214,6 @@ document.addEventListener("DOMContentLoaded", async function() {
         if (depSelect) depSelect.innerHTML = '<option value="">Error de servidor local</option>';
     }
 
-    // 2. FILTRAR PROVINCIAS
     if (depSelect && provSelect && distSelect) {
         depSelect.addEventListener("change", async function() {
             const idDep = this.value; 
@@ -224,7 +242,6 @@ document.addEventListener("DOMContentLoaded", async function() {
         });
     }
 
-    // 3. FILTRAR DISTRITOS
     if (provSelect && distSelect) {
         provSelect.addEventListener("change", async function() {
             const idProv = this.value; 
@@ -251,9 +268,6 @@ document.addEventListener("DOMContentLoaded", async function() {
         });
     }
 
-    // ==========================================
-    // SISTEMA DE CONTRASEÑAS, CAPTCHA Y VALIDACIÓN
-    // ==========================================
     const toggleButtons = document.querySelectorAll(".toggle-password");
     toggleButtons.forEach(btn => {
         btn.addEventListener("click", function() {
@@ -324,7 +338,6 @@ document.addEventListener("DOMContentLoaded", async function() {
                 return;
             }
 
-            // IMPORTANTE: Transformar IDs a Texto antes de guardar (para guardar "Lima" y no "15")
             if(depSelect && depSelect.value) depSelect.options[depSelect.selectedIndex].value = depSelect.options[depSelect.selectedIndex].text;
             if(provSelect && provSelect.value) provSelect.options[provSelect.selectedIndex].value = provSelect.options[provSelect.selectedIndex].text;
             if(distSelect && distSelect.value) distSelect.options[distSelect.selectedIndex].value = distSelect.options[distSelect.selectedIndex].text;

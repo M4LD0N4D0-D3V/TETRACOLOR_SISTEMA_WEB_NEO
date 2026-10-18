@@ -63,6 +63,12 @@ class UsuariosSistema(db.Model):
     rol = db.Column(db.String(50), nullable=False)
     direccion = db.Column(db.Text)
     telefono = db.Column(db.String(20))
+    id_tipo_documento = db.Column(db.Integer, db.ForeignKey('tipo_documento.id'))
+    documento = db.Column(db.String(20))
+    estado = db.Column(db.String(20), default='Activo')
+    departamento = db.Column(db.String(50))
+    provincia = db.Column(db.String(50))
+    distrito = db.Column(db.String(50))
 
     # Relaciones
     pedidos_atendidos = db.relationship('Pedido', backref='empleado', lazy=True)
@@ -178,6 +184,37 @@ class RegistroSeguridad(db.Model):
     bloqueado_hasta = db.Column(db.DateTime, nullable=True)
     ultima_actividad = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Proveedor(db.Model):
+    __tablename__ = 'proveedor'
+    id = db.Column(db.Integer, primary_key=True)
+    razon_social = db.Column(db.String(150), nullable=False)
+    ruc = db.Column(db.String(11), unique=True, nullable=False)
+    contacto = db.Column(db.String(100))
+    telefono = db.Column(db.String(20))
+    correo = db.Column(db.String(100))
+    direccion = db.Column(db.Text)
+    estado = db.Column(db.String(20), default='Activo')
+
+class Inventario(db.Model):
+    __tablename__ = 'inventario'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre_insumo = db.Column(db.String(150), nullable=False)
+    descripcion = db.Column(db.Text)
+    unidad_medida = db.Column(db.String(20), nullable=False)
+    stock_actual = db.Column(db.Numeric(10, 2), default=0.00)
+    stock_minimo = db.Column(db.Numeric(10, 2), default=0.00)
+    estado = db.Column(db.String(20), default='Activo')
+
+class MovimientoInventario(db.Model):
+    __tablename__ = 'movimiento_inventario'
+    id = db.Column(db.Integer, primary_key=True)
+    id_insumo = db.Column(db.Integer, db.ForeignKey('inventario.id'))
+    tipo_movimiento = db.Column(db.String(20), nullable=False)
+    cantidad = db.Column(db.Numeric(10, 2), nullable=False)
+    motivo = db.Column(db.String(255))
+    id_proveedor = db.Column(db.Integer, db.ForeignKey('proveedor.id'))
+    id_usuario_sistema = db.Column(db.Integer, db.ForeignKey('usuarios_sistema.id'))
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
 
 def get_connection(): 
     URI_SUPABASE = os.getenv("DATABASE_URL")

@@ -236,11 +236,16 @@ def crear_pedido_cliente():
         
         # 2. Registrar el Pago en historial_pagos si existe un monto
         if monto_pago and float(monto_pago) > 0:
+            # Buscar el ID del método de pago
+            cursor.execute("SELECT id FROM metodo_pago WHERE nombre = %s", (metodo_pago,))
+            mp_res = cursor.fetchone()
+            mp_id = mp_res['id'] if isinstance(mp_res, dict) else (mp_res[0] if mp_res else None)
+
             query_pago = """
-                INSERT INTO historial_pagos (id_pedido, monto, metodo_pago, "Referencia_voucher")
+                INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, referencia_voucher)
                 VALUES (%s, %s, %s, %s)
             """
-            cursor.execute(query_pago, (pedido_id, monto_pago, metodo_pago, referencia_voucher))
+            cursor.execute(query_pago, (pedido_id, monto_pago, mp_id, referencia_voucher))
         
         # Confirmamos la transacción
         conn.commit()
@@ -414,13 +419,10 @@ def registro_presencial():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # --- CONFIGURACIÓN DE SEGURIDAD ---
     MAX_INTENTOS = 2        
     MINUTOS_BLOQUEO = 1   
-    
 
     ip_cliente = request.remote_addr
-    
     
     permitido, tiempo_restante = verificar_seguridad_ip(ip_cliente)
     if not permitido:
@@ -441,6 +443,11 @@ def login():
 
         # Si el usuario existe y la contraseña coincide
         if usuario and bcrypt.check_password_hash(usuario['clave'], clave):
+            # --- CORRECCIÓN AUTH-02: Validar si la cuenta está inhabilitada ---
+            if usuario.get('estado') == 'Inhabilitado':
+                flash("Tu cuenta se encuentra inhabilitada. Por favor, contacta con soporte.", "danger")
+                return render_template('login.html')
+
             session['usuario_id'] = usuario['id']
             session['nombre'] = usuario['nombre']
             session['rol'] = 'cliente'
@@ -449,11 +456,9 @@ def login():
             return redirect('/')
         
         else:
-            # 3. LOGIN FALLIDO
             bloqueado_ahora = registrar_fallo_ip(ip_cliente, correo) 
             
             if bloqueado_ahora:
-                # El mensaje ahora usa las variables dinámicas
                 flash(f"Has superado el límite de {MAX_INTENTOS} intentos permitidos. Tu IP ha sido bloqueada por {MINUTOS_BLOQUEO} minutos.", "danger")
             else:
                 conn = get_connection()
@@ -463,14 +468,11 @@ def login():
                 conn.close()
                 
                 intentos_actuales = registro['intentos'] if registro else 1
-                
-                # Calculamos los intentos restantes usando la variable MAX_INTENTOS
                 intentos_restantes = MAX_INTENTOS - intentos_actuales
-                
-                # Mensaje ultra claro con los números exactos
                 flash(f"Correo o contraseña incorrectos. Te quedan {intentos_restantes} intentos antes de bloquear tu IP por {MINUTOS_BLOQUEO} minutos.", "warning")
 
     return render_template('login.html')
+
 
 @app.route('/logout')
 def logout():
@@ -579,73 +581,34 @@ def pedidos():
         historial_clientes=historial_por_cliente
     )
 
-############################################
-@app.route('/pedido/<int:id_pedido>/enviar_mensaje', methods=['POST'])
-def enviar_mensaje(id_pedido):
-    mensaje = request.form.get('mensaje', '').strip()
-    archivo = request.files.get('adjunto')
 
-    # 1. Determinar el rol actual
-    rol_actual = session.get('rol', 'cliente')
-    if rol_actual not in ['administrador', 'cliente']:
-        rol_actual = 'cliente'
-
-    # 2. OBTENER EL NOMBRE DEL REMITENTE (Cambia 'nombre' o 'usuario' según como guardas en session)
-    remitente_nombre = session.get('nombre') or session.get('usuario') or ('Administrador' if rol_actual == 'administrador' else 'Cliente')
-
-    nombre_archivo = None
-    carpeta_destino = os.path.join('static', 'uploads', 'mensajes')
-    os.makedirs(carpeta_destino, exist_ok=True)
-
-    if archivo and archivo.filename != '':
-        filename = f"{int(time.time())}_{secure_filename(archivo.filename)}"
-        archivo.save(os.path.join(carpeta_destino, filename))
-        nombre_archivo = filename
-
-    if not mensaje and not nombre_archivo:
-        flash('Escribe un mensaje o adjunta un archivo/comprobante.', 'warning')
-        return redirect(request.referrer or url_for('pedidos'))
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        # 3. AGREGAR 'remitente_nombre' A LA SENTENCIA SQL
-        cursor.execute("""
-            INSERT INTO pedido_mensajes (id_pedido, mensaje, archivo_adjunto, remitente_rol, remitente_nombre, fecha)
-            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-        """, (id_pedido, mensaje, nombre_archivo, rol_actual, remitente_nombre))
-
-        conn.commit()
-        flash('Mensaje / Comprobante enviado correctamente.', 'success')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error al registrar en la bitácora: {e}', 'danger')
-    finally:
-        cursor.close()
-        conn.close()
-
-    return redirect(request.referrer or url_for('pedidos'))
     ##################################
 @app.route('/pedido/<int:id>')
+@login_required
 def ver_detalle_pedido(id):
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True) # dictionary=True permite acceder como obj.propiedad
+    # Usamos RealDictCursor compatible con PostgreSQL/psycopg2
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
 
     try:
         # 1. Obtener datos del pedido
-        cursor.execute("SELECT * FROM pedidos WHERE id = %s", (id,))
+        cursor.execute("SELECT * FROM pedido WHERE id = %s", (id,))
         pedido = cursor.fetchone()
 
         if not pedido:
             flash('El pedido solicitado no existe.', 'warning')
             return redirect(url_for('pedidos'))
+            
+        # Validación de seguridad: un cliente no puede ver pedidos de otros
+        if session.get('rol') == 'cliente' and pedido['id_usuario'] != session.get('usuario_id'):
+            flash('No tienes permiso para ver este pedido.', 'danger')
+            return redirect(url_for('mis_pedidos'))
 
-        # 2. Obtener historial de pagos
-        cursor.execute("SELECT * FROM pagos WHERE id_pedido = %s ORDER BY fecha ASC", (id,))
+        # 2. Obtener historial de pagos (Nombre de tabla correcto)
+        cursor.execute("SELECT * FROM historial_pagos WHERE id_pedido = %s ORDER BY fecha ASC", (id,))
         pagos = cursor.fetchall()
 
-        # 3. Obtener historial de la bitácora / comprobantes
+        # 3. Obtener historial de la bitácora
         cursor.execute("""
             SELECT id, id_pedido, mensaje, archivo_adjunto, remitente_rol, fecha 
             FROM pedido_mensajes 
@@ -661,7 +624,6 @@ def ver_detalle_pedido(id):
         cursor.close()
         conn.close()
 
-    # Enviamos pedido, pagos y mensajes al HTML
     return render_template('pedido_detalle.html', pedido=pedido, pagos=pagos, mensajes=mensajes)
 ######################
 
@@ -779,7 +741,7 @@ def historial_cliente(id_usuario):
 #####################################################21
 @app.route('/admin/seguridad')
 @login_required
-# Asegúrate de tener tu decorador @admin_required aquí si lo usas
+@admin_required
 def admin_seguridad():
     """Muestra el reporte de IPs bloqueadas e intentos de hackeo o fallos."""
     conn = get_connection()
@@ -800,20 +762,20 @@ def admin_seguridad():
 # ========================================================
 # --- ACTUALIZAR PAGOS / ADELANTOS DEL PEDIDO ---
 # ========================================================
-# ========================================================
-# --- REGISTRAR NUEVO ABONO / PAGO DEL PEDIDO ---
-# ========================================================
 @app.route('/pedido/actualizar_pago/<int:id>', methods=['POST'])
+@login_required
+@admin_required
 def actualizar_pago(id):
     monto_pago = float(request.form.get('monto_pago', 0))
-    metodo_pago = request.form.get('metodo_pago')
+    metodo_pago_nombre = request.form.get('metodo_pago') # Recibimos el texto del select
 
     if monto_pago <= 0:
         flash('El monto ingresado debe ser mayor a cero.', 'danger')
         return redirect(url_for('pedidos'))
 
     conn = get_connection()
-    cursor = conn.cursor()
+    # Importante usar RealDictCursor aquí si tu código original espera diccionarios
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     try:
         # 1. Consultar estado actual del pedido
@@ -829,17 +791,21 @@ def actualizar_pago(id):
             flash('Pedido no encontrado.', 'danger')
             return redirect(url_for('pedidos'))
 
-        # Compatibilidad tupla/dict
-        if isinstance(pedido, dict):
-            adelanto_actual = float(pedido['adelanto'] or 0.0)
-            total_pagado_bd = float(pedido['total_pagado'] or 0.0)
-            precio_unitario = float(pedido['precio'] or 0.0)
-            cantidad = int(pedido['cantidad'] or 1)
-        else:
-            adelanto_actual = float(pedido[0] or 0.0)
-            total_pagado_bd = float(pedido[1] or 0.0)
-            precio_unitario = float(pedido[2] or 0.0)
-            cantidad = int(pedido[3] or 1)
+        # Como usamos RealDictCursor, leemos como diccionario seguro
+        adelanto_actual = float(pedido['adelanto'] or 0.0)
+        total_pagado_bd = float(pedido['total_pagado'] or 0.0)
+        precio_unitario = float(pedido['precio'] or 0.0)
+        cantidad = int(pedido['cantidad'] or 1)
+
+        # 2. Buscar el ID del método de pago basado en el nombre que vino del formulario
+        cursor.execute("SELECT id FROM metodo_pago WHERE nombre = %s", (metodo_pago_nombre,))
+        mp_res = cursor.fetchone()
+        
+        if not mp_res:
+            flash(f"El método de pago '{metodo_pago_nombre}' no existe en el sistema.", 'danger')
+            return redirect(url_for('pedidos'))
+            
+        mp_id = mp_res['id']
 
         # Si el costo total está en 0, lo calculamos
         precio_total = total_pagado_bd if total_pagado_bd > 0 else (precio_unitario * cantidad)
@@ -849,20 +815,20 @@ def actualizar_pago(id):
         if nuevo_adelanto > precio_total:
             nuevo_adelanto = precio_total
 
-        # 2. Actualizar la tabla pedido
+        # 3. Actualizar la tabla pedido usando la llave foránea correcta (id_metodo_pago)
         cursor.execute("""
             UPDATE pedido 
             SET adelanto = %s,
                 total_pagado = %s,
-                metodo_pago = %s
+                id_metodo_pago = %s
             WHERE id = %s
-        """, (nuevo_adelanto, precio_total, metodo_pago, id))
+        """, (nuevo_adelanto, precio_total, mp_id, id))
 
-        # 3. Registrar el abono individual en historial_pagos
+        # 4. Registrar el abono individual en historial_pagos (con id_metodo_pago)
         cursor.execute("""
-            INSERT INTO historial_pagos (id_pedido, monto, metodo_pago, fecha, referencia_voucher)
+            INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, fecha, referencia_voucher)
             VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s)
-        """, (id, monto_pago, metodo_pago, 'Abono registrado por Admin'))
+        """, (id, monto_pago, mp_id, 'Abono registrado por Admin'))
 
         conn.commit()
 
@@ -904,6 +870,23 @@ def productos():
         
     return render_template('productos.html', productos=lista_productos)
 ################################
+@app.route('/productos/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_producto():
+    nombre = request.form.get('nombre_producto')
+    precio = request.form.get('precio')
+    
+    if nombre and precio:
+        nuevo_prod = Producto(nombre_producto=nombre, precio=float(precio))
+        db.session.add(nuevo_prod)
+        db.session.commit()
+        flash("Producto creado exitosamente.", "success")
+    else:
+        flash("Datos inválidos.", "danger")
+        
+    return redirect('/productos')
+######################
 # ==========================================
 # --- MODIFICAR PRODUCTOS Y PRECIOS ---
 # ==========================================
@@ -1100,37 +1083,68 @@ from flask import jsonify, request
 # ========================================================
 # --- SISTEMA DE MENSAJES Y CONSTATACIÓN DE PEDIDOS ---
 # ========================================================
-
-@app.route('/pedido/<int:pedido_id>/enviar_mensaje', methods=['POST'])
+@app.route('/pedido/<int:id_pedido>/enviar_mensaje', methods=['POST'])
 @login_required
-def enviar_mensaje_pedido(pedido_id):
-    """Ruta única para que Clientes y Admins guarden mensajes de constatación."""
-    mensaje = request.form.get('mensaje')
-    
-    if not mensaje or not mensaje.strip():
-        flash("El mensaje no puede estar vacío.", "warning")
-        return redirect(request.referrer)
-        
-    nombre_remitente = session.get('nombre')
-    rol_remitente = session.get('rol') # 'cliente' o 'admin'
-    
+def enviar_mensaje(id_pedido):
+    mensaje = request.form.get('mensaje', '').strip()
+    archivo = request.files.get('adjunto')
+
+    # 1. Determinar el rol actual seguro desde la sesión
+    rol_actual = session.get('rol', 'cliente')
+    if rol_actual not in ['administrador', 'asistente', 'consultor', 'cliente']:
+        rol_actual = 'cliente'
+
+    # 2. Obtener el nombre del remitente
+    remitente_nombre = session.get('nombre') or ('Administrador' if rol_actual != 'cliente' else 'Cliente')
+
+    # 3. Manejo seguro de subida de archivos
+    nombre_archivo = None
+    carpeta_destino = os.path.join('static', 'uploads', 'mensajes')
+    os.makedirs(carpeta_destino, exist_ok=True)
+
+    if archivo and archivo.filename != '':
+        if allowed_file(archivo.filename):
+            filename = f"{int(time.time())}_{secure_filename(archivo.filename)}"
+            archivo.save(os.path.join(carpeta_destino, filename))
+            nombre_archivo = filename
+        else:
+            flash('Tipo de archivo no permitido. Sube imágenes (PNG, JPG) o PDF.', 'danger')
+            return redirect(request.referrer or url_for('pedidos'))
+
+    if not mensaje and not nombre_archivo:
+        flash('Escribe un mensaje o adjunta un archivo/comprobante.', 'warning')
+        return redirect(request.referrer or url_for('pedidos'))
+
+    # 4. Inserción en Base de Datos
     conn = get_connection()
     cursor = conn.cursor()
+
     try:
+        # Verificación de seguridad: si es cliente, validar que el pedido le pertenezca
+        if rol_actual == 'cliente':
+            cursor.execute("SELECT id FROM pedido WHERE id = %s AND id_usuario = %s", (id_pedido, session.get('usuario_id')))
+            if not cursor.fetchone():
+                flash('No tienes permiso para comentar en este pedido.', 'danger')
+                return redirect(url_for('mis_pedidos'))
+
+        # Inserción del mensaje
         cursor.execute("""
-            INSERT INTO pedido_mensajes (id_pedido, remitente_nombre, remitente_rol, mensaje, fecha)
-            VALUES (%s, %s, %s, %s, NOW())
-        """, (pedido_id, nombre_remitente, rol_remitente, mensaje.strip()))
+            INSERT INTO pedido_mensajes (id_pedido, mensaje, archivo_adjunto, remitente_rol, remitente_nombre, fecha)
+            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+        """, (id_pedido, mensaje, nombre_archivo, rol_actual, remitente_nombre))
+
         conn.commit()
-        flash("Mensaje/Observación registrada en el historial del pedido.", "success")
+        flash('Mensaje / Comprobante registrado correctamente en la bitácora.', 'success')
     except Exception as e:
+        conn.rollback()
         print(f"Error al registrar mensaje: {e}")
-        flash("No se pudo registrar el mensaje.", "danger")
+        flash('Error al registrar en la bitácora.', 'danger')
     finally:
+        cursor.close()
         conn.close()
-        
-    # request.referrer hace magia: devuelve al usuario de donde vino (ya sea el panel admin o cliente)
-    return redirect(request.referrer)
+
+    # Retorna a la vista anterior (sea la del cliente o la del administrador)
+    return redirect(request.referrer or url_for('pedidos'))
 
 ####################################################################
 @app.route('/nosotros')
@@ -1192,8 +1206,10 @@ def admin_nuevo_usuario_sistema():
 # DASHBOARD ADMINISTRATIVO (VERSIÓN OPTIMIZADA CON VISTAS)
 # ==========================================
 @app.route('/admin/dashboard')
-# @admin_required  # O el decorador que uses para proteger rutas
+@login_required
+@admin_required
 def admin_dashboard():
+    # ... código existente ...
     # ----------------------------------------
     # 1. MÉTRICAS DE CLIENTES
     # ----------------------------------------
@@ -1346,62 +1362,58 @@ def crear_preferencia_mp(pedido_id):
 @app.route('/pago_mp_respuesta/<estado>/<int:pedido_id>')
 @login_required
 def pago_mp_respuesta(estado, pedido_id):
-    """Ruta a la que Mercado Pago redirige al cliente después de pagar"""
     payment_id = request.args.get('payment_id')
-    status = request.args.get('status')
     
-    if estado == 'exito' and status == 'approved':
-        conn = get_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        try:
-            # 1. Verificar si el pago ya fue registrado (evita que recarguen la página y dupliquen)
-            cursor.execute("SELECT id FROM historial_pagos WHERE referencia_voucher = %s", (f"MP-{payment_id}",))
-            if not cursor.fetchone():
-                
-                # 2. Obtener datos del pedido
-                cursor.execute("""
-                    SELECT adelanto, total_pagado, 
-                           (cantidad * (SELECT precio FROM producto WHERE id = id_producto)) AS costo_calc 
-                    FROM pedido WHERE id = %s
-                """, (pedido_id,))
-                ped = cursor.fetchone()
-                
-                costo_total = float(ped['total_pagado']) if ped['total_pagado'] > 0 else float(ped['costo_calc'])
-                adelanto_previo = float(ped['adelanto'] or 0)
-                monto_pagado = costo_total - adelanto_previo # Pagó el saldo restante
-                
-                # 3. Obtener el ID del método 'Mercado Pago'
-                cursor.execute("SELECT id FROM metodo_pago WHERE nombre = 'Mercado Pago'")
-                mp_method = cursor.fetchone()
-                mp_id = mp_method['id'] if mp_method else None
-                
-                # 4. Registrar en historial_pagos
-                cursor.execute("""
-                    INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, referencia_voucher, fecha)
-                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
-                """, (pedido_id, monto_pagado, mp_id, f"MP-{payment_id}"))
-                
-                # 5. Actualizar el pedido marcándolo como pagado (adelanto = costo_total)
-                cursor.execute("""
-                    UPDATE pedido SET adelanto = %s, total_pagado = %s WHERE id = %s
-                """, (costo_total, costo_total, pedido_id))
-                
-                conn.commit()
-                flash(f"¡Pago procesado con éxito! El pedido #{pedido_id} ha sido cancelado.", "success")
-            else:
-                flash("Este pago ya había sido procesado anteriormente.", "info")
-                
-        except Exception as e:
-            conn.rollback()
-            print(f"Error BD Pago: {e}")
-            flash("Pago aprobado, pero hubo un error al registrarlo. Contacta a soporte.", "warning")
-        finally:
-            conn.close()
+    if estado == 'exito' and payment_id:
+        # Validación Servidor a Servidor con Mercado Pago
+        payment_info = sdk.payment().get(payment_id)
+        
+        if payment_info["status"] == 200 and payment_info["response"]["status"] == "approved":
+            conn = get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            try:
+                cursor.execute("SELECT id FROM historial_pagos WHERE referencia_voucher = %s", (f"MP-{payment_id}",))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        SELECT adelanto, total_pagado, 
+                               (cantidad * (SELECT precio FROM producto WHERE id = id_producto)) AS costo_calc 
+                        FROM pedido WHERE id = %s
+                    """, (pedido_id,))
+                    ped = cursor.fetchone()
+                    
+                    costo_total = float(ped['total_pagado']) if ped['total_pagado'] > 0 else float(ped['costo_calc'])
+                    adelanto_previo = float(ped['adelanto'] or 0)
+                    monto_pagado = costo_total - adelanto_previo 
+                    
+                    cursor.execute("SELECT id FROM metodo_pago WHERE nombre = 'Mercado Pago'")
+                    mp_method = cursor.fetchone()
+                    mp_id = mp_method['id'] if mp_method else None
+                    
+                    cursor.execute("""
+                        INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, referencia_voucher, fecha)
+                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    """, (pedido_id, monto_pagado, mp_id, f"MP-{payment_id}"))
+                    
+                    cursor.execute("""
+                        UPDATE pedido SET adelanto = %s, total_pagado = %s WHERE id = %s
+                    """, (costo_total, costo_total, pedido_id))
+                    
+                    conn.commit()
+                    flash(f"¡Pago validado y procesado con éxito! El pedido #{pedido_id} ha sido cancelado.", "success")
+                else:
+                    flash("Este pago ya había sido procesado.", "info")
+            except Exception as e:
+                conn.rollback()
+                flash("Error al registrar el pago aprobado.", "warning")
+            finally:
+                conn.close()
+        else:
+            flash("El pago no fue aprobado por Mercado Pago.", "danger")
             
     elif estado == 'fallo':
-        flash(f"El pago del pedido #{pedido_id} fue rechazado o cancelado.", "danger")
+        flash(f"El pago del pedido #{pedido_id} fue rechazado.", "danger")
     elif estado == 'pendiente':
-        flash(f"El pago del pedido #{pedido_id} está pendiente de confirmación por Mercado Pago.", "warning")
+        flash(f"El pago del pedido #{pedido_id} está pendiente.", "warning")
         
     return redirect(url_for('mis_pedidos'))
 
@@ -1415,7 +1427,6 @@ def consultar_api():
     if not numero or not tipo:
         return jsonify({"error": "Faltan parámetros"}), 400
         
-    # Tu token de Decolecta
     token = os.getenv("DECOLECTA_TOKEN") 
     
     if tipo == 'dni':
@@ -1429,11 +1440,10 @@ def consultar_api():
     }
     
     try:
-        # Hacemos la petición pura, sin .json() para evitar el error de diccionario
-        respuesta = requests.get(url, headers=headers)
+        # AGREGADO: timeout=5 para evitar bloqueos del servidor
+        respuesta = requests.get(url, headers=headers, timeout=5)
         
         if respuesta.status_code == 200:
-            # Recién aquí, garantizando que todo salió bien, lo pasamos al navegador
             return jsonify(respuesta.json()), 200
         elif respuesta.status_code in [401, 403]:
             return jsonify({"error": "Error de Token: Token de Decolecta inválido."}), 401
@@ -1444,6 +1454,8 @@ def consultar_api():
         else:
             return jsonify({"error": "Error en el servidor de Decolecta."}), 500
             
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "El servicio de consulta excedió el tiempo de respuesta. Intenta manualmente."}), 504
     except Exception as e:
         return jsonify({"error": f"Error de conexión: {str(e)}"}), 500
 
@@ -1477,6 +1489,221 @@ def api_distritos(prov_id):
     data = cursor.fetchall()
     conn.close()
     return jsonify(data)
+
+##############################################
+# ========================================================
+# --- GESTIÓN DE ENVÍOS ---
+# ========================================================
+@app.route('/pedido/<int:id_pedido>/envio', methods=['POST'])
+@login_required
+@admin_required
+def actualizar_envio(id_pedido):
+    agencia = request.form.get('agencia_transporte')
+    numero_guia = request.form.get('numero_guia')
+    fecha_envio = request.form.get('fecha_envio')
+    
+    if not agencia or not numero_guia:
+        flash("La agencia y el número de guía son obligatorios.", "warning")
+        return redirect(request.referrer)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Verificar si el pedido ya tiene un registro de envío
+        cursor.execute("SELECT id FROM envio_pedido WHERE id_pedido = %s", (id_pedido,))
+        envio_existente = cursor.fetchone()
+
+        if envio_existente:
+            cursor.execute("""
+                UPDATE envio_pedido 
+                SET agencia_transporte = %s, numero_guia = %s, fecha_envio = %s 
+                WHERE id_pedido = %s
+            """, (agencia, numero_guia, fecha_envio, id_pedido))
+        else:
+            cursor.execute("""
+                INSERT INTO envio_pedido (id_pedido, agencia_transporte, numero_guia, fecha_envio) 
+                VALUES (%s, %s, %s, %s)
+            """, (id_pedido, agencia, numero_guia, fecha_envio))
+
+        # Opcional: Actualizar el estado del pedido a "Enviado" automáticamente
+        cursor.execute("UPDATE pedido SET estado = 'Enviado' WHERE id = %s", (id_pedido,))
+        
+        conn.commit()
+        flash('Datos de envío y número de guía registrados con éxito.', 'success')
+    except Exception as e:
+        conn.rollback()
+        print(f"Error al registrar envío: {e}")
+        flash('Error al guardar los datos de envío.', 'danger')
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(request.referrer or url_for('pedidos'))    
+
+
+####################################
+# ========================================================
+# --- GENERACIÓN DE COMPROBANTES ---
+# ========================================================
+@app.route('/pedido/<int:id_pedido>/comprobante')
+@login_required
+def ver_comprobante(id_pedido):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Traer datos del pedido, cliente y producto
+        cursor.execute("""
+            SELECT p.*, pr.nombre_producto, pr.precio, u.nombre, u.apellidos, u.documento, u.correo 
+            FROM pedido p
+            JOIN producto pr ON p.id_producto = pr.id
+            JOIN usuario u ON p.id_usuario = u.id
+            WHERE p.id = %s
+        """, (id_pedido,))
+        pedido = cursor.fetchone()
+
+        if not pedido:
+            flash('El pedido no existe.', 'warning')
+            return redirect(url_for('pedidos'))
+
+        # Seguridad: Si es cliente, validar que sea su propio pedido
+        if session.get('rol') == 'cliente' and pedido['id_usuario'] != session.get('usuario_id'):
+            flash('Acceso denegado al comprobante.', 'danger')
+            return redirect(url_for('mis_pedidos'))
+
+        # Traer historial de pagos
+        cursor.execute("SELECT monto, fecha, referencia_voucher FROM historial_pagos WHERE id_pedido = %s", (id_pedido,))
+        pagos = cursor.fetchall()
+        
+    except Exception as e:
+        print(f"Error al generar comprobante: {e}")
+        flash("Error al cargar el comprobante.", "danger")
+        return redirect(request.referrer)
+    finally:
+        cursor.close()
+        conn.close()
+
+    # Necesitarás crear un archivo 'comprobante.html' en tu carpeta templates
+    return render_template('comprobante.html', pedido=pedido, pagos=pagos)    
+
+#######################################
+# ========================================================
+# --- MÓDULO DE INVENTARIO Y PROVEEDORES ---
+# ========================================================
+
+@app.route('/admin/proveedores', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def gestion_proveedores():
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    if request.method == 'POST':
+        razon_social = request.form.get('razon_social')
+        ruc = request.form.get('ruc')
+        contacto = request.form.get('contacto')
+        telefono = request.form.get('telefono')
+        
+        try:
+            cursor.execute("""
+                INSERT INTO proveedor (razon_social, ruc, contacto, telefono) 
+                VALUES (%s, %s, %s, %s)
+            """, (razon_social, ruc, contacto, telefono))
+            conn.commit()
+            flash('Proveedor registrado exitosamente.', 'success')
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error al guardar proveedor: {str(e)}', 'danger')
+        return redirect(url_for('gestion_proveedores'))
+        
+    cursor.execute("SELECT * FROM proveedor ORDER BY razon_social ASC")
+    proveedores = cursor.fetchall()
+    conn.close()
+    return render_template('admin/proveedores.html', proveedores=proveedores)
+
+@app.route('/admin/inventario', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def gestion_inventario():
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    if request.method == 'POST':
+        nombre = request.form.get('nombre_insumo')
+        unidad = request.form.get('unidad_medida')
+        minimo = request.form.get('stock_minimo', 0)
+        categoria = request.form.get('categoria') # NUEVO
+        
+        try:
+            cursor.execute("""
+                INSERT INTO inventario (nombre_insumo, unidad_medida, stock_minimo, categoria) 
+                VALUES (%s, %s, %s, %s)
+            """, (nombre, unidad, minimo, categoria))
+            conn.commit()
+            flash('Insumo registrado en el inventario.', 'success')
+        except Exception as e:
+            conn.rollback()
+            flash('Error al guardar el insumo.', 'danger')
+        return redirect(url_for('gestion_inventario'))
+        
+    cursor.execute("SELECT * FROM inventario ORDER BY nombre_insumo ASC")
+    insumos = cursor.fetchall()
+    
+    cursor.execute("SELECT id, razon_social FROM proveedor WHERE estado = 'Activo'")
+    proveedores = cursor.fetchall()
+    
+    conn.close()
+    return render_template('admin/inventario.html', insumos=insumos, proveedores=proveedores)
+
+@app.route('/admin/inventario/movimiento', methods=['POST'])
+@login_required
+@admin_required
+def movimiento_inventario():
+    id_insumo = request.form.get('id_insumo')
+    tipo = request.form.get('tipo_movimiento')
+    motivo = request.form.get('motivo', '').strip()
+    
+    # Manejar conversión limpia de números y nulos
+    try:
+        cantidad = float(request.form.get('cantidad', 0))
+    except ValueError:
+        cantidad = 0.0
+
+    raw_proveedor = request.form.get('id_proveedor')
+    id_proveedor = int(raw_proveedor) if raw_proveedor and raw_proveedor.strip() != "" else None
+    id_usuario = session.get('usuario_id')
+
+    if cantidad <= 0:
+        flash("La cantidad debe ser mayor a cero.", "warning")
+        return redirect(url_for('gestion_inventario'))
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Registrar movimiento en la tabla Kardex
+        cursor.execute("""
+            INSERT INTO movimiento_inventario 
+            (id_insumo, tipo_movimiento, cantidad, motivo, id_proveedor, id_usuario_sistema) 
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (id_insumo, tipo, cantidad, motivo, id_proveedor, id_usuario))
+
+        # 2. Actualizar el stock en la tabla inventario
+        if tipo == 'Ingreso':
+            cursor.execute("UPDATE inventario SET stock_actual = stock_actual + %s WHERE id = %s", (cantidad, id_insumo))
+        else:
+            cursor.execute("UPDATE inventario SET stock_actual = stock_actual - %s WHERE id = %s", (cantidad, id_insumo))
+
+        conn.commit()
+        flash(f'Movimiento de {tipo.lower()} ({cantidad}) registrado con éxito.', 'success')
+    except Exception as e:
+        conn.rollback()
+        print(f"Error procesando movimiento de inventario: {e}")
+        flash('Ocurrió un error al registrar el movimiento.', 'danger')
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for('gestion_inventario'))
 
 if __name__ == '__main__': 
     app.run(debug=True)
