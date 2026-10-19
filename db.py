@@ -239,6 +239,10 @@ class MovimientoInventario(db.Model):
     id_usuario_sistema = db.Column(db.Integer, db.ForeignKey('usuarios_sistema.id'))
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
 
-def get_connection(): 
-    URI_SUPABASE = os.getenv("DATABASE_URL")
-    return psycopg2.connect(URI_SUPABASE)
+def get_connection():
+    uri = os.getenv("DATABASE_URL")
+    if uri and uri.startswith("postgresql+psycopg2://"):
+        uri = uri.replace("postgresql+psycopg2://", "postgresql://", 1)
+    elif uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    return psycopg2.connect(uri)
