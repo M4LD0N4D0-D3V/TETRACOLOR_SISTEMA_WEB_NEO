@@ -51,7 +51,12 @@ def lima_time_filter(dt):
 # CONFIGURACIÓN DE BASE DE DATOS (.ENV)
 # ==========================================
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
+if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgresql://"):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgresql://", "postgresql+psycopg2://", 1)
+elif app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql+psycopg2://", 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 
 db.init_app(app)
 bcrypt = Bcrypt(app)
