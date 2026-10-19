@@ -1,18 +1,19 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container py-5">
+<!-- Usamos container-fluid px-4 para aprovechar el 100% del ancho del monitor -->
+<div class="container-fluid px-4 py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold"><i class="bi bi-list-check"></i> Gestión de Pedidos y Cotizaciones</h2>
+        <h2 class="fw-bold text-dark"><i class="bi bi-list-check text-success"></i> Gestión de Pedidos y Cotizaciones</h2>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-dark fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
-            <i class="bi bi-speedometer2"></i> ir al Dashboard
+            <i class="bi bi-speedometer2"></i> Ir al Dashboard
         </a>
     </div>
 
-    <!-- TABLA PRINCIPAL DE PEDIDOS -->
+    <!-- TABLA PRINCIPAL DE PEDIDOS (ANCHO COMPLETO Y MÁXIMO APROVECHAMIENTO DE ESPACIO) -->
     <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
                     <thead class="table-dark text-nowrap">
                         <tr>
                             <th class="ps-4">ID</th>
@@ -20,14 +21,14 @@
                             <th>Cliente</th>
                             <th>Producto Solicitado</th>
                             <th>Estado</th>
-                            <th class="pe-4 text-end">Acciones</th>
+                            <th class="pe-4 text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for pedido in pedidos %}
                         <tr>
                             <td class="ps-4 fw-bold text-muted">#{{ pedido.id }}</td>
-                            <td class="text-nowrap">{{ pedido.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="text-nowrap">{{ pedido.fecha|lima_time }}</td>
                             <td class="text-nowrap"><strong>{{ pedido.cliente }}</strong></td>
                             <td>{{ pedido.producto }}</td>
                             <td class="text-nowrap">
@@ -45,13 +46,13 @@
                             </td>
                             
                             <td class="pe-4 text-nowrap">
-                                <div class="d-flex gap-2 align-items-center justify-content-end">
-                                    <button type="button" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDetalles{{ pedido.id }}">
+                                <div class="d-flex gap-1 align-items-center justify-content-end">
+                                    <button type="button" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1 shadow-sm px-2" data-bs-toggle="modal" data-bs-target="#modalDetalles{{ pedido.id }}">
                                         <i class="bi bi-eye"></i> Ver
                                     </button>
 
                                     {% set chat_ped = mensajes.get(pedido.id, []) %}
-                                    <button type="button" class="btn btn-sm btn-dark position-relative d-inline-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalChatAdmin{{ pedido.id }}">
+                                    <button type="button" class="btn btn-sm btn-dark position-relative d-inline-flex align-items-center gap-1 shadow-sm px-2" data-bs-toggle="modal" data-bs-target="#modalChatAdmin{{ pedido.id }}">
                                         <i class="bi bi-chat-square-dots"></i> Mensajería
                                         {% if chat_ped and (chat_ped|last).remitente_rol == 'cliente' %}
                                         <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
@@ -61,17 +62,17 @@
                                     </button>
 
                                     {% if pedido.telefono %}
-                                    <a href="https://wa.me/51{{ pedido.telefono }}?text=Hola%20{{ pedido.cliente | urlencode }}%2C%20te%20escribimos%20de%20Tetracolor%20por%20su%20pedido%20%23{{ pedido.id }}" target="_blank" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 shadow-sm" title="Contactar por WhatsApp">
+                                    <a href="https://wa.me/51{{ pedido.telefono }}?text=Hola%20{{ pedido.cliente | urlencode }}%2C%20te%20escribimos%20de%20Tetracolor%20por%20su%20pedido%20%23{{ pedido.id }}" target="_blank" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 shadow-sm px-2" title="Contactar por WhatsApp">
                                         <i class="bi bi-whatsapp"></i>
                                     </a>
                                     {% endif %}
 
-                                    <button type="button" class="btn btn-sm btn-info text-dark d-inline-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalHistorialCliente{{ pedido.id }}">
+                                    <button type="button" class="btn btn-sm btn-info text-dark d-inline-flex align-items-center gap-1 shadow-sm px-2" data-bs-toggle="modal" data-bs-target="#modalHistorialCliente{{ pedido.id }}">
                                         <i class="bi bi-clock-history"></i> Historial
                                     </button>
 
                                     <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-primary dropdown-toggle fw-bold shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <button class="btn btn-sm btn-outline-primary dropdown-toggle fw-bold shadow-sm px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                             Cambiar Estado
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow">
@@ -80,7 +81,7 @@
                                             <li><a class="dropdown-item" href="/pedidos/estado/{{ pedido.id }}/Completado"><i class="bi bi-check-circle text-success"></i> Completado</a></li>
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <a class="dropdown-item text-danger fw-bold" href="/pedidos/anular/{{ pedido.id }}" onclick="return confirm('¿Estás seguro de que deseas ANULAR este pedido? La información se conservará en el historial.')">
+                                                <a class="dropdown-item text-danger fw-bold" href="/pedidos/anular/{{ pedido.id }}" onclick="return confirm('¿Estás seguro de que deseas ANULAR este pedido?')">
                                                     <i class="bi bi-x-circle"></i> Anular Pedido
                                                 </a>
                                             </li>

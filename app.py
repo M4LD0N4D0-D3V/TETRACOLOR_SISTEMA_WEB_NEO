@@ -4,6 +4,7 @@ import time
 import requests
 import psycopg2.extras
 import mercadopago
+import uuid
 from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
@@ -17,12 +18,33 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_bcrypt import Bcrypt
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, text
-from db import db, Usuario, Producto, Pedido, TipoDocumento, get_connection 
+from db import db, Usuario, Producto, Pedido, TipoDocumento, get_connection, MetodoPago, HistorialPagos 
+from db import CategoriaProducto, VariacionMaterial
+from werkzeug.exceptions import RequestEntityTooLarge
+from zoneinfo import ZoneInfo
+
 
 app = Flask(__name__)
 
 app.secret_key = os.getenv("SECRET_KEY", "clave_por_defecto_respaldo")
 
+# Configurar Zona Horaria de Lima
+LIMA_TZ = ZoneInfo("America/Lima")
+
+@app.template_filter('lima_time')
+def lima_time_filter(dt):
+    """Filtro Jinja2 para convertir cualquier Timestamp UTC a Hora Local de Lima."""
+    if not dt:
+        return ""
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except ValueError:
+            return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    dt_lima = dt.astimezone(LIMA_TZ)
+    return dt_lima.strftime('%Y-%m-%d %H:%M:%S')
 
 
 # ==========================================
@@ -33,6 +55,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 bcrypt = Bcrypt(app)
+
+
+
 # ==========================================
 # --- SISTEMA DE SEGURIDAD PERSISTENTE (BD) ---
 # ==========================================
@@ -118,6 +143,17 @@ def resetear_ip(ip):
     finally:
         conn.close()
 
+# Decorador para proteger rutas restringidas a administradores
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or getattr(current_user, 'rol', None) != 'Admin':
+            flash("Acceso denegado: Se requieren permisos de administrador.", "danger")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # ==========================================
 # CONFIGURACIÓN DE SUBIDA DE ARCHIVOS
 # ==========================================
@@ -125,7 +161,7 @@ def resetear_ip(ip):
 UPLOAD_FOLDER = 'static/uploads/disenos'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Limitar el tamaño a 5MB por seguridad
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024 
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 
 # Crear la carpeta si no existe
@@ -133,6 +169,42 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_size_error(e):
+    flash("El archivo adjunto supera el tamaño máximo permitido. Intenta subiendo un archivo de menor peso.", "danger")
+    return redirect(request.referrer or url_for('index'))    
+
+###########################################################
+
+
+# 1. Definir extensiones permitidas estrictamente
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'ai', 'cdr', 'zip'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# 2. Función segura para guardar archivos
+def guardar_archivo_seguro(archivo_obj, carpeta_destino):
+    if not archivo_obj or archivo_obj.filename == '':
+        return None
+        
+    if not allowed_file(archivo_obj.filename):
+        flash("Extensión de archivo no permitida. Sube solo imágenes, PDFs o archivos de diseño.", "danger")
+        return None
+
+    # secure_filename elimina caracteres peligrosos (como / o \ o ..)
+    nombre_seguro = secure_filename(archivo_obj.filename)
+    
+    # Opcional pero RECOMENDADO: Agregar un UUID para evitar sobreescritura de archivos con el mismo nombre
+    nombre_unico = f"{uuid.uuid4().hex}_{nombre_seguro}"
+    
+    ruta_completa = os.path.join(carpeta_destino, nombre_unico)
+    archivo_obj.save(ruta_completa)
+    
+    return nombre_unico # Esto es lo que guardas en la base de datos (ej. en Pedido.archivo_diseno)
 
 # ==========================================
 # DECORADORES DE SEGURIDAD
@@ -158,119 +230,172 @@ def admin_required(f):
 # ==========================================
 # RUTAS PÚBLICAS Y DE CLIENTES (FRONT-OFFICE)
 # ==========================================
+# PASO 1: PÁGINA PRINCIPAL (Muestra solo las CATEGORÍAS como en la imagen 1)
 @app.route("/")
 def index():
-    # Usamos SQL directo para filtrar solo los productos Activos
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        # Traemos solo los Activos o los nulos (por si hay productos muy antiguos)
-        cursor.execute("SELECT * FROM producto WHERE estado = 'Activo' OR estado IS NULL ORDER BY id DESC")
-        productos_activos = cursor.fetchall()
+        # Traemos solo las categorías para la pantalla inicial
+        cursor.execute("SELECT * FROM categoria_producto WHERE estado = 'Activo' ORDER BY id ASC")
+        categorias_activas = cursor.fetchall()
     except Exception as e:
-        print(f"Error al cargar productos en el catálogo: {e}")
-        productos_activos = []
+        print(f"Error al cargar categorías: {e}")
+        categorias_activas = []
     finally:
         conn.close()
         
-    return render_template("index.html", productos=productos_activos)
+    return render_template("index.html", categorias=categorias_activas)
+
+# PASO 2: VISTA DE LA CATEGORÍA (Muestra los PRODUCTOS de esa categoría como en la imagen 2)
+@app.route("/categoria/<int:id_categoria>")
+def ver_categoria(id_categoria):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        # Obtenemos los datos de la categoría actual
+        cursor.execute("SELECT * FROM categoria_producto WHERE id = %s", (id_categoria,))
+        categoria = cursor.fetchone()
+        
+        # Obtenemos TODOS los productos que pertenecen a ESTA categoría específica
+        cursor.execute("SELECT * FROM producto WHERE id_categoria = %s AND (estado = 'Activo' OR estado IS NULL)", (id_categoria,))
+        productos_categoria = cursor.fetchall()
+    except Exception as e:
+        print(f"Error al cargar productos de la categoría: {e}")
+        categoria = None
+        productos_categoria = []
+    finally:
+        conn.close()
+        
+    if not categoria:
+        flash("La categoría no existe.", "warning")
+        return redirect(url_for('index'))
+        
+    return render_template("categoria_productos.html", categoria=categoria, productos=productos_categoria)
+
+# PASO 3: DETALLE DEL PRODUCTO (Donde se elige tela, tinta, etc.)
+# (Aquí usamos la ruta /producto/<int:id> que ya habíamos configurado en el paso anterior)
 
 @app.route("/producto/<int:id>")
 def detalle_producto(id):
+    # 1. Buscamos el producto
     producto = Producto.query.get_or_404(id)
-    return render_template("detalle.html", producto=producto)
+    
+    # 2. Traemos todas las variaciones de materiales que pertenecen a la categoría de este producto
+    variaciones = VariacionMaterial.query.filter_by(
+        id_categoria=producto.id_categoria, 
+        estado='Activo'
+    ).all()
+
+    # 3. Agrupamos las variaciones por su tipo (Para generar los Selects dinámicos)
+    # Ejemplo de resultado: {'Tipo de Tela': [Obj(Jersey), Obj(Franela)], 'Tipo de Tinta': [Obj(Plastisol)]}
+    opciones_agrupadas = {}
+    for var in variaciones:
+        if var.tipo_variacion not in opciones_agrupadas:
+            opciones_agrupadas[var.tipo_variacion] = []
+        opciones_agrupadas[var.tipo_variacion].append(var)
+
+    return render_template(
+        'detalle.html', 
+        producto=producto, 
+        opciones_agrupadas=opciones_agrupadas
+    )
 
 @app.route("/crear_pedido_cliente", methods=["POST"])
 @login_required
 def crear_pedido_cliente():
-    id_usuario = session["usuario_id"]
+    # 1. Obtener ID de usuario desde Flask-Login
+    id_usuario = session.get('usuario_id')
     id_producto = request.form.get("id_producto")
-    cantidad = request.form.get("cantidad", 1)
+    cantidad = request.form.get("cantidad", 1, type=int)
     
-    # Capturamos el material y notas
-    material = request.form.get("material", "N/A") 
-    notas = request.form.get("notas", "")
+    material = request.form.get("material", "N/A").strip()
+    notas = request.form.get("notas", "").strip()
     
-    # ==========================================
-    # DATOS DEL PAGO / ADELANTO (AÑADIDO)
-    # ==========================================
-    monto_pago = request.form.get("monto_pago") or request.form.get("monto_adelanto")
-    metodo_pago = request.form.get("metodo_pago", "Transferencia")
-    referencia_voucher = request.form.get("referencia_voucher", "")
+    monto_pago_raw = request.form.get("monto_pago") or request.form.get("monto_adelanto")
+    metodo_pago_nombre = request.form.get("metodo_pago", "Transferencia").strip()
+    referencia_voucher = request.form.get("referencia_voucher", "").strip()
     
     especificaciones = f"Material: {material} | Notas: {notas}"
-    fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # ==========================================
-    # LÓGICA PARA GUARDAR LA IMAGEN DEL CLIENTE
-    # ==========================================
+    # 2. Manejo Seguro de la Imagen del Diseño
     nombre_archivo = None
     if 'imagen_diseno' in request.files:
         file = request.files['imagen_diseno']
         if file and file.filename != '':
             if allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                nombre_unico = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
-                ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_unico)
+                # Generamos un nombre único con timestamp + UUID para evitar colisiones
+                nombre_archivo = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}_{filename}"
+                ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
                 file.save(ruta_guardado)
-                nombre_archivo = nombre_unico
             else:
                 flash("Formato de imagen no permitido. Usa JPG, PNG o PDF.", "danger")
-                return redirect(request.url)
+                return redirect(request.referrer or url_for('index'))
 
-    conn = get_connection()
-    cursor = conn.cursor()
-    
+    # 3. Inserción con SQLAlchemy ORM
     try:
-        # 1. Insertar el Pedido (RETURNING id asegura obtener el ID en PostgreSQL/Supabase)
-        query_pedido = """
-            INSERT INTO pedido (id_usuario, id_producto, cantidad, fecha, especificaciones, archivo_diseno, estado)
-            VALUES (%s, %s, %s, %s, %s, %s, 'Pendiente')
-            RETURNING id
-        """
-        cursor.execute(query_pedido, (id_usuario, id_producto, cantidad, fecha, especificaciones, nombre_archivo))
+        # Instanciar el nuevo pedido
+        nuevo_pedido = Pedido(
+            id_usuario=id_usuario,
+            id_producto=id_producto,
+            cantidad=cantidad,
+            especificaciones=especificaciones,
+            archivo_diseno=nombre_archivo,
+            estado='Pendiente'
+        )
+        db.session.add(nuevo_pedido)
         
-        # Obtenemos el ID del pedido recién generado
-        res = cursor.fetchone()
-        pedido_id = res['id'] if isinstance(res, dict) else res[0]
-        
-        # 2. Registrar el Pago en historial_pagos si existe un monto
-        if monto_pago and float(monto_pago) > 0:
-            # Buscar el ID del método de pago
-            cursor.execute("SELECT id FROM metodo_pago WHERE nombre = %s", (metodo_pago,))
-            mp_res = cursor.fetchone()
-            mp_id = mp_res['id'] if isinstance(mp_res, dict) else (mp_res[0] if mp_res else None)
+        # db.session.flush() genera el ID autoincrementable de 'nuevo_pedido' sin cerrar la transacción
+        db.session.flush() 
 
-            query_pago = """
-                INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, referencia_voucher)
-                VALUES (%s, %s, %s, %s)
-            """
-            cursor.execute(query_pago, (pedido_id, monto_pago, mp_id, referencia_voucher))
-        
-        # Confirmamos la transacción
-        conn.commit()
+        # 4. Registrar Pago/Adelanto si existe un monto
+        if monto_pago_raw:
+            try:
+                monto_pago = float(monto_pago_raw)
+                if monto_pago > 0:
+                    # Buscar el ID del método de pago dinámicamente
+                    mp = MetodoPago.query.filter(MetodoPago.nombre.ilike(metodo_pago_nombre)).first()
+                    mp_id = mp.id if mp else None
+
+                    pago = HistorialPagos(
+                        id_pedido=nuevo_pedido.id,
+                        monto=monto_pago,
+                        id_metodo_pago=mp_id,
+                        referencia_voucher=referencia_voucher
+                    )
+                    db.session.add(pago)
+
+                    # Actualizamos los montos acumulados en la entidad Pedido
+                    nuevo_pedido.adelanto = monto_pago
+                    nuevo_pedido.total_pagado = monto_pago
+
+            except ValueError:
+                flash("El monto de pago ingresado no es un número válido.", "warning")
+
+        # Confirmamos la transacción completa
+        db.session.commit()
+        return redirect(url_for('pedido_exitoso', id=nuevo_pedido.id))
 
     except Exception as e:
-        conn.rollback()
+        db.session.rollback()
         print(f"Error al registrar pedido/pago: {e}")
         flash("Ocurrió un error al procesar el pedido.", "danger")
-        return redirect(request.url)
-    finally:
-        conn.close()
-    
-    return redirect(url_for('pedido_exitoso', id=pedido_id))
+        # request.referrer redirige al formulario anterior en lugar de la misma ruta POST
+        return redirect(request.referrer or url_for('index'))
 
 
 @app.route("/pedido_exitoso/<int:id>")
 @login_required
 def pedido_exitoso(id):
     return render_template("pedido_exitoso.html", pedido_id=id)
+
+
 #####################################################################################################################
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     ip_cliente = request.remote_addr
     
-    # Si la IP está bloqueada por sospecha de hackeo, no puede registrar cuentas
     permitido, tiempo_restante = verificar_seguridad_ip(ip_cliente)
     if not permitido:
         flash(f"Acceso restringido. No puedes registrar cuentas en este momento. Espera {tiempo_restante} segundos.", "danger")
@@ -278,34 +403,30 @@ def registro():
 
     if request.method == 'POST':
         documento = request.form["documento"]
-        tipo_doc = request.form.get("tipo_doc", "dni") # Capturamos el texto (ej: "dni")
+        tipo_doc = request.form.get("tipo_doc", "dni")
         
-        # --- SOLUCIÓN 1: BUSCAMOS EL ID NUMÉRICO EN LA BASE DE DATOS ---
         tipo_bd = TipoDocumento.query.filter(TipoDocumento.nombre.ilike(tipo_doc)).first()
         id_tipo_doc = tipo_bd.id if tipo_bd else None
         
-        # LÓGICA DE NOMBRE: Si es RUC usa Razón Social, para cualquier otro tipo construye con nombres y apellidos
+        # --- SEPARACIÓN CORRECTA DE NOMBRES Y APELLIDOS ---
         if tipo_doc.lower() == "ruc":
-            nombre_completo = request.form.get("razon_social", "")
+            nombre = request.form.get("razon_social", "").strip()
+            apellidos = ""
         else:
-            nombres = request.form.get("nombres", "")
-            paterno = request.form.get("apellido_paterno", "")
-            materno = request.form.get("apellido_materno", "")
-            nombre_completo = f"{nombres} {paterno} {materno}".strip()
+            nombre = request.form.get("nombres", "").strip()
+            paterno = request.form.get("apellido_paterno", "").strip()
+            materno = request.form.get("apellido_materno", "").strip()
+            apellidos = f"{paterno} {materno}".strip()
 
         telefono = request.form["telefono"]
         correo = request.form["correo"]
         clave = request.form["clave"]
         
-        # Capturamos los datos de ubicación
         direccion = request.form.get("direccion", "")
         departamento = request.form.get("departamento", "")
         provincia = request.form.get("provincia", "")
         distrito = request.form.get("distrito", "")
         
-        # ==========================================
-        # VALIDACIONES ESTRICTAS DE FORMATO
-        # ==========================================
         if not re.match(r'^\d{9}$', telefono):
             flash("El número de celular debe tener exactamente 9 dígitos numéricos.", "danger")
             return redirect(url_for("registro"))
@@ -314,25 +435,26 @@ def registro():
             flash("El formato del correo electrónico no es válido.", "danger")
             return redirect(url_for("registro"))
         
-        # Validar duplicados
         if Usuario.query.filter_by(correo=correo).first() or Usuario.query.filter_by(documento=documento).first():
             flash("El correo o el documento ya están registrados.", "danger")
             return redirect(url_for("registro"))
             
         pw_hash = bcrypt.generate_password_hash(clave).decode('utf-8')
         
-        # Guardamos en la base de datos usando el ID numérico
+        # Guardamos asignando explícitamente nombre y apellidos por separado
         nuevo = Usuario(
-            id_tipo_documento=id_tipo_doc, # <--- Ahora esto funciona perfectamente
+            id_tipo_documento=id_tipo_doc,
             documento=documento, 
-            nombre=nombre_completo, 
+            nombre=nombre,
+            apellidos=apellidos,  # <--- Asignado correctamente a su columna
             telefono=telefono, 
             correo=correo, 
             clave=pw_hash,
             direccion=direccion,
             departamento=departamento,
             provincia=provincia,
-            distrito=distrito
+            distrito=distrito,
+            estado="Habilitado"
         )
         
         db.session.add(nuevo)
@@ -346,73 +468,84 @@ def registro():
 ##############################################################################################################################
 
 @app.route("/registro_presencial", methods=["GET", "POST"])
+@login_required       # 1. Exige autenticación
+@admin_required      # 2. Exige rol de administrador
 def registro_presencial():
 
     if request.method == "POST":
+        # Limpieza de espacios en blanco accidentales
+        documento = request.form.get("documento", "").strip()
+        tipo_doc = request.form.get("tipo_doc", "dni").strip()
+        telefono = request.form.get("telefono", "").strip()
+        correo = request.form.get("correo", "").strip()
+        clave = request.form.get("clave", "").strip()
 
-        documento = request.form["documento"]
-        tipo_doc = request.form.get("tipo_doc", "dni")
-
-        # --- SOLUCIÓN 2: BUSCAMOS EL ID NUMÉRICO EN LA BASE DE DATOS PARA PRESENCIAL ---
+        # --- BUSCAR TIPO DE DOCUMENTO EN BD ---
         tipo_bd = TipoDocumento.query.filter(TipoDocumento.nombre.ilike(tipo_doc)).first()
-        id_tipo_doc = tipo_bd.id if tipo_bd else None
+        
+        if not tipo_bd:
+            flash(f"El tipo de documento '{tipo_doc}' no es válido en el sistema.", "danger")
+            return redirect(url_for("registro_presencial"))
+            
+        id_tipo_doc = tipo_bd.id
 
-        # LÓGICA DE NOMBRE: RUC = Razón Social | Otros (DNI, CE, Pasaporte) = Nombres + Apellidos
+        # --- LÓGICA DE NOMBRE Y APELLIDOS ---
+        # Separación para mantener compatibilidad con la columna 'apellidos' usada en comprobantes
         if tipo_doc.lower() == "ruc":
-            nombre_completo = request.form.get("razon_social", "")
+            nombre = request.form.get("razon_social", "").strip()
+            apellidos = ""
         else:
-            nombres = request.form.get("nombres", "")
-            paterno = request.form.get("apellido_paterno", "")
-            materno = request.form.get("apellido_materno", "")
-            nombre_completo = f"{nombres} {paterno} {materno}".strip()
+            nombre = request.form.get("nombres", "").strip()
+            paterno = request.form.get("apellido_paterno", "").strip()
+            materno = request.form.get("apellido_materno", "").strip()
+            apellidos = f"{paterno} {materno}".strip()
 
-        telefono = request.form["telefono"]
-        correo = request.form["correo"]
-
-        # CONTRASEÑA OPCIONAL
-        clave = request.form.get("clave")
-
-        # ==========================================
-        # VALIDACIONES ESTRICTAS DE FORMATO
-        # ==========================================
+        # --- VALIDACIONES ESTRICTAS ---
         if not re.match(r'^\d{9}$', telefono):
             flash("El número de celular debe tener exactamente 9 dígitos numéricos.", "danger")
             return redirect(url_for("registro_presencial"))
-            
+
         if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', correo):
             flash("El formato del correo electrónico no es válido.", "danger")
             return redirect(url_for("registro_presencial"))
 
-        # VALIDAR DUPLICADOS
+        # --- VALIDAR DUPLICADOS ---
         existe_correo = Usuario.query.filter_by(correo=correo).first()
         existe_documento = Usuario.query.filter_by(documento=documento).first()
 
         if existe_correo or existe_documento:
-            flash("El correo o documento ya están registrados.", "danger")
+            flash("El correo o documento ya se encuentran registrados.", "danger")
             return redirect(url_for("registro_presencial"))
 
-        # SI NO ESCRIBE CONTRASEÑA
-        if not clave or clave.strip() == "":
+        # --- CONTRASEÑA POR DEFECTO ---
+        if not clave:
             clave = documento
 
-        # GENERAR HASH
         pw_hash = bcrypt.generate_password_hash(clave).decode('utf-8')
 
-        # CREAR USUARIO CON EL ID DEL TIPO DE DOCUMENTO CORRECTO
-        nuevo = Usuario(
-            id_tipo_documento=id_tipo_doc, # <--- Corregido: antes decía tipo_documento=tipo_doc
-            documento=documento,
-            nombre=nombre_completo,
-            telefono=telefono,
-            correo=correo,
-            clave=pw_hash
-        )
+        # --- INSERCIÓN EN BASE DE DATOS (CON ROLLBACK SEGURO) ---
+        try:
+            nuevo = Usuario(
+                id_tipo_documento=id_tipo_doc,
+                documento=documento,
+                nombre=nombre,
+                apellidos=apellidos,  # Agregado para que no falle al generar comprobantes
+                telefono=telefono,
+                correo=correo,
+                clave=pw_hash,
+                estado="Habilitado"
+            )
 
-        db.session.add(nuevo)
-        db.session.commit()
+            db.session.add(nuevo)
+            db.session.commit()
 
-        flash("Cliente presencial registrado correctamente.", "success")
-        return redirect(url_for("clientes"))
+            flash("Cliente presencial registrado correctamente.", "success")
+            return redirect(url_for("clientes"))
+
+        except Exception as e:
+            db.session.rollback()
+            flash("Ocurrió un error en la base de datos al registrar el usuario.", "danger")
+            return redirect(url_for("registro_presencial"))
 
     return render_template("admin/nuevo_cliente.html")
 ########################################################################################################
@@ -1286,9 +1419,8 @@ def admin_dashboard():
 #########################
 
 # ==========================================
-# PASARELA DE PAGO: MERCADO PAGO
-# ========================================
-
+# PASARELA DE PAGO CON ADELANTO DINÁMICO
+# ==========================================
 @app.route('/api/crear_preferencia_mp/<int:pedido_id>', methods=['POST'])
 @login_required
 def crear_preferencia_mp(pedido_id):
@@ -1296,7 +1428,6 @@ def crear_preferencia_mp(pedido_id):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
-        # 1. Buscar el pedido y validar que pertenezca al usuario logueado
         cursor.execute('''
             SELECT p.id, pr.nombre_producto, p.cantidad, pr.precio, p.total_pagado, p.adelanto
             FROM pedido p
@@ -1308,22 +1439,30 @@ def crear_preferencia_mp(pedido_id):
         if not pedido:
             return jsonify({"error": "Pedido no encontrado o no autorizado"}), 404
             
-        # 2. Calcular el saldo pendiente real
         costo_total = float(pedido['total_pagado']) if float(pedido['total_pagado']) > 0 else float(pedido['cantidad'] * pedido['precio'])
-        adelanto = float(pedido['adelanto'] or 0)
-        saldo = costo_total - adelanto
+        adelanto_actual = float(pedido['adelanto'] or 0)
+        saldo_pendiente = round(costo_total - adelanto_actual, 2)
         
-        if saldo <= 0.01:
-            return jsonify({"error": "Este pedido ya se encuentra pagado en su totalidad."}), 400
+        if saldo_pendiente <= 0.01:
+            return jsonify({"error": "Este pedido ya se encuentra cancelado al 100%."}), 400
 
-        # 3. Crear la "Preferencia" de Mercado Pago (El carrito virtual)
+        # Capturar el monto enviado desde el cliente
+        data = request.get_json() or {}
+        monto_a_pagar = float(data.get('monto', saldo_pendiente))
+        
+        if monto_a_pagar <= 0:
+            return jsonify({"error": "El monto a pagar debe ser mayor a S/ 0.00"}), 400
+            
+        if round(monto_a_pagar, 2) > saldo_pendiente:
+            return jsonify({"error": f"El monto ingresado (S/ {monto_a_pagar:.2f}) no puede superar el saldo pendiente (S/ {saldo_pendiente:.2f})."}), 400
+
         preference_data = {
             "items": [
                 {
-                    "title": f"Pago de saldo - Pedido #{pedido_id} ({pedido['nombre_producto']})",
+                    "title": f"Abono / Adelanto - Pedido #{pedido_id} ({pedido['nombre_producto']})",
                     "quantity": 1,
                     "currency_id": "PEN",
-                    "unit_price": saldo
+                    "unit_price": round(monto_a_pagar, 2)
                 }
             ],
             "back_urls": {
@@ -1336,25 +1475,17 @@ def crear_preferencia_mp(pedido_id):
         }
         
         preference_response = sdk.preference().create(preference_data)
-        
-        # Imprimir la respuesta completa en la terminal
-        print("RESPUESTA MERCADO PAGO:", preference_response) 
-        
         preference = preference_response["response"]
         
-        # Si no hay init_point, evitamos que la app se rompa y mostramos el error
         if "init_point" not in preference:
-            print("ERROR DETALLADO:", preference)
-            return jsonify({"error": "Error de credenciales o datos con Mercado Pago."}), 400
+            return jsonify({"error": "Error al conectar con Mercado Pago."}), 400
 
-        # 4. Devolver la URL de pago al Frontend
-        # Usar sandbox_init_point para pruebas con tarjetas de prueba
         link_pago = preference.get("sandbox_init_point") or preference.get("init_point")
         return jsonify({"init_point": link_pago})
         
     except Exception as e:
         print(f"Error MercadoPago: {e}")
-        return jsonify({"error": "Error interno al conectar con la pasarela."}), 500
+        return jsonify({"error": "Error interno al procesar la pasarela."}), 500
     finally:
         conn.close()
 
@@ -1365,10 +1496,12 @@ def pago_mp_respuesta(estado, pedido_id):
     payment_id = request.args.get('payment_id')
     
     if estado == 'exito' and payment_id:
-        # Validación Servidor a Servidor con Mercado Pago
         payment_info = sdk.payment().get(payment_id)
         
         if payment_info["status"] == 200 and payment_info["response"]["status"] == "approved":
+            # Extraer el monto exacto abonado a través de Mercado Pago
+            monto_abonado = float(payment_info["response"]["transaction_amount"])
+            
             conn = get_connection()
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             try:
@@ -1381,39 +1514,45 @@ def pago_mp_respuesta(estado, pedido_id):
                     """, (pedido_id,))
                     ped = cursor.fetchone()
                     
-                    costo_total = float(ped['total_pagado']) if ped['total_pagado'] > 0 else float(ped['costo_calc'])
+                    costo_total = float(ped['total_pagado']) if float(ped['total_pagado']) > 0 else float(ped['costo_calc'])
                     adelanto_previo = float(ped['adelanto'] or 0)
-                    monto_pagado = costo_total - adelanto_previo 
+                    nuevo_adelanto = min(adelanto_previo + monto_abonado, costo_total)
                     
                     cursor.execute("SELECT id FROM metodo_pago WHERE nombre = 'Mercado Pago'")
                     mp_method = cursor.fetchone()
                     mp_id = mp_method['id'] if mp_method else None
                     
+                    # Guardar con la fecha exacta de Lima
                     cursor.execute("""
                         INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, referencia_voucher, fecha)
-                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
-                    """, (pedido_id, monto_pagado, mp_id, f"MP-{payment_id}"))
+                        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')
+                    """, (pedido_id, monto_abonado, mp_id, f"MP-{payment_id}"))
                     
                     cursor.execute("""
                         UPDATE pedido SET adelanto = %s, total_pagado = %s WHERE id = %s
-                    """, (costo_total, costo_total, pedido_id))
+                    """, (nuevo_adelanto, costo_total, pedido_id))
                     
                     conn.commit()
-                    flash(f"¡Pago validado y procesado con éxito! El pedido #{pedido_id} ha sido cancelado.", "success")
+                    
+                    saldo_restante = costo_total - nuevo_adelanto
+                    if saldo_restante <= 0.01:
+                        flash(f"¡Pago completo procesado! El pedido #{pedido_id} fue cancelado al 100%.", "success")
+                    else:
+                        flash(f"¡Adelanto de S/ {monto_abonado:.2f} registrado con éxito! Saldo restante: S/ {saldo_restante:.2f}", "success")
                 else:
-                    flash("Este pago ya había sido procesado.", "info")
+                    flash("Este pago ya había sido procesado previamente.", "info")
             except Exception as e:
                 conn.rollback()
-                flash("Error al registrar el pago aprobado.", "warning")
+                flash("Error al registrar el pago en la base de datos.", "warning")
             finally:
                 conn.close()
         else:
             flash("El pago no fue aprobado por Mercado Pago.", "danger")
             
     elif estado == 'fallo':
-        flash(f"El pago del pedido #{pedido_id} fue rechazado.", "danger")
+        flash(f"El proceso de pago del pedido #{pedido_id} fue cancelado o rechazado.", "danger")
     elif estado == 'pendiente':
-        flash(f"El pago del pedido #{pedido_id} está pendiente.", "warning")
+        flash(f"El abono para el pedido #{pedido_id} quedó en estado pendiente.", "warning")
         
     return redirect(url_for('mis_pedidos'))
 

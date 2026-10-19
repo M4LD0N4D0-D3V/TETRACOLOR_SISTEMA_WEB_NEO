@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 from dotenv import load_dotenv
 
+
 # Cargar variables
 load_dotenv()
 
@@ -16,9 +17,8 @@ class TipoDocumento(db.Model):
     nombre = db.Column(db.String(100), nullable=False, unique=True)
     estado = db.Column(db.String(20), default='Activo')
 
-    # Relaciones
-    usuarios = db.relationship('Usuario', backref='tipo_documento_rel', lazy=True)
-
+    # CORRECCIÓN: Cambiamos 'tipo_documento_rel' por 'tipo_documento'
+    usuarios = db.relationship('Usuario', backref='tipo_documento', lazy=True)
 
 class MetodoPago(db.Model):
     __tablename__ = 'metodo_pago'
@@ -34,22 +34,24 @@ class MetodoPago(db.Model):
 
 class Usuario(db.Model):
     __tablename__ = 'usuario'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
+    apellidos = db.Column(db.String(100), nullable=True)  # Agregado para resolver inconsistencia
     correo = db.Column(db.String(100), nullable=False, unique=True)
     clave = db.Column(db.String(255), nullable=False)
-    telefono = db.Column(db.String(20))
-    documento = db.Column(db.String(20))
-    estado = db.Column(db.String(20), default='Habilitado')
-    id_tipo_documento = db.Column(db.Integer, db.ForeignKey('tipo_documento.id'))
-    direccion = db.Column(db.Text)
-    departamento = db.Column(db.String(100))
-    provincia = db.Column(db.String(100))
-    distrito = db.Column(db.String(100))
+    telefono = db.Column(db.String(20), nullable=True)
+    documento = db.Column(db.String(20), nullable=True)
+    estado = db.Column(db.String(50), default='Habilitado')
+    id_tipo_documento = db.Column(db.Integer, db.ForeignKey('tipo_documento.id'), nullable=True)
+    direccion = db.Column(db.Text, nullable=True)
+    departamento = db.Column(db.String(100), nullable=True)
+    provincia = db.Column(db.String(100), nullable=True) 
+    distrito = db.Column(db.String(100), nullable=True) 
+    fecha_registro = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
 
     # Relaciones
-    pedidos = db.relationship('Pedido', backref='cliente', lazy=True)
+    #tipo_documento = db.relationship('TipoDocumento', backref='usuarios')
 
 
 class UsuariosSistema(db.Model):
@@ -64,12 +66,11 @@ class UsuariosSistema(db.Model):
     direccion = db.Column(db.Text)
     telefono = db.Column(db.String(20))
     id_tipo_documento = db.Column(db.Integer, db.ForeignKey('tipo_documento.id'))
-    documento = db.Column(db.String(20))
-    estado = db.Column(db.String(20), default='Activo')
-    departamento = db.Column(db.String(50))
-    provincia = db.Column(db.String(50))
-    distrito = db.Column(db.String(50))
-
+    documento = db.Column(db.String(20), nullable=True)
+    estado = db.Column(db.String(50), default='Habilitado')
+    departamento = db.Column(db.String(100), nullable=True)
+    provincia = db.Column(db.String(100), nullable=True)
+    distrito = db.Column(db.String(100), nullable=True)
     # Relaciones
     pedidos_atendidos = db.relationship('Pedido', backref='empleado', lazy=True)
 
@@ -82,16 +83,38 @@ class CategoriaProducto(db.Model):
     descripcion = db.Column(db.Text)
     estado = db.Column(db.String(20), default='Activo')
 
-    # Relaciones
+    # Relaciones existentes y nuevas
     productos = db.relationship('Producto', backref='categoria', lazy=True)
+    variaciones = db.relationship('VariacionMaterial', backref='categoria', lazy=True, cascade="all, delete-orphan")
+    
+class VariacionMaterial(db.Model):
+    __tablename__ = 'variacion_material'
 
+    id = db.Column(db.Integer, primary_key=True)
+    id_categoria = db.Column(db.Integer, db.ForeignKey('categoria_producto.id'), nullable=False)
+    
+    # El tipo agrupará las opciones: Ej. "Tipo de Tela", "Tipo de Tinta", "Acabado"
+    tipo_variacion = db.Column(db.String(50), nullable=False) 
+    
+    # El nombre de la opción: Ej. "Jersey de Algodón", "Plastisol", "Foil Dorado"
+    nombre = db.Column(db.String(100), nullable=False) 
+    
+    # Costo adicional: Si elegir "Foil Dorado" suma S/ 5.00 al precio base
+    costo_extra = db.Column(db.Numeric(10, 2), default=0.00) 
+    
+    estado = db.Column(db.String(20), default='Activo')
 
 class Producto(db.Model):
     __tablename__ = 'producto' 
 
     id = db.Column(db.Integer, primary_key=True)
     nombre_producto = db.Column(db.String(150), nullable=False) 
-    precio = db.Column(db.Numeric(10, 2), nullable=False) 
+    
+    # Precios (Nuevos campos)
+    precio = db.Column(db.Numeric(10, 2), nullable=False) # Precio Unitario Normal
+    precio_mayor = db.Column(db.Numeric(10, 2), nullable=True) # Precio al por mayor (Ej: 35.00)
+    cantidad_minima_mayor = db.Column(db.Integer, default=12) # A partir de cuántas unidades se aplica el precio_mayor
+
     descripcion = db.Column(db.Text)    
     imagen = db.Column(db.String(255))
     estado = db.Column(db.String(20), default='Activo')

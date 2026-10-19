@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
+    .text-cinematic { font-family: 'Montserrat', sans-serif; }
+    
+    .card-magnific {
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+        aspect-ratio: 4/5;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        background-color: #1a1a1a;
+    }
+    
+    .card-magnific:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+    }
+    
+    .product-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .overlay-gradient {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 50%;
+        background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 50%, transparent 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 1.2rem;
+        z-index: 2;
+    }
+
+    /* Forzar textos en blanco para máximo contraste */
+    .product-title {
+        color: #ffffff !important;
+        font-size: 1.1rem;
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 0.3rem;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    }
+
+    .product-price {
+        color: #e0e0e0 !important;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .btn-fucsia {
+        background-color: #198754; 
+        color: white;
+        border-radius: 6px;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        border: none;
+    }
+    .btn-fucsia:hover {
+        background-color: #146c43;
+        color: white;
+    }
+</style>
+
+<div class="container py-4 text-cinematic">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb fs-6">
+            <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">Inicio</a></li>
+            <li class="breadcrumb-item active fw-bold text-dark" aria-current="page">{{ categoria.nombre }}</li>
+        </ol>
+    </nav>
+
+    <div class="mb-4 pb-2 border-bottom border-2 border-dark">
+        <h1 class="display-5 fw-bold text-dark text-uppercase tracking-tight">{{ categoria.nombre }}</h1>
+    </div>
+
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+        {% for p in productos %}
+        <div class="col">
+            <div class="card-magnific shadow-sm">
+                <!-- Se eliminó el carrusel. Ahora solo carga la imagen real del producto -->
+                <img src="{{ p.imagen }}" alt="{{ p.nombre_producto }}" class="product-img">
+                
+                <a href="/producto/{{ p.id }}" class="text-decoration-none">
+                    <div class="overlay-gradient">
+                        <h3 class="product-title">{{ p.nombre_producto }}</h3>
+                        <div class="product-price">S/{{ "%.2f"|format(p.precio) }}</div>
+                        <button class="btn btn-fucsia w-100 py-2">Ver opciones</button>
+                    </div>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

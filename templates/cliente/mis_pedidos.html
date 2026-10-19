@@ -59,19 +59,39 @@
                                 <span class="fw-bold fs-5 {% if saldo > 0 %}text-danger{% else %}text-success{% endif %}">
                                     S/ {{ "%.2f"|format(saldo) }}
                                 </span>
-                                
-                                <!-- BOTÓN DE MERCADO PAGO -->
-                                {% if saldo > 0 and pedido.estado != 'Anulado' %}
-                                <button onclick="pagarConMercadoPago('{{ pedido.id }}', this)" class="btn btn-sm text-white mt-1 w-100 shadow-sm" style="background-color: #009ee3; font-weight: 600; border-radius: 8px;">                                    <i class="bi bi-credit-card"></i> Pagar Saldo
-                                </button>
-                                {% endif %}
-                                
                             </div>
                         </div>
+
+                        <!-- INPUT Y BOTÓN PARA PAGO PARCIAL O COMPLETO -->
+                        {% set saldo = pedido.total_pagado - pedido.adelanto %}
+                        {% if saldo > 0 and pedido.estado != 'Anulado' %}
+                        <div class="mt-3 pt-2 border-top">
+                            <label for="montoPago{{ pedido.id }}" class="form-label text-start d-block mb-1 fw-bold text-dark" style="font-size: 0.75rem;">
+                                Ingrese el monto a abonar (Max S/ {{ "%.2f"|format(saldo) }}):
+                            </label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white fw-bold text-success">S/</span>
+                                <input type="number" 
+                                       id="montoPago{{ pedido.id }}" 
+                                       class="form-control text-end fw-bold fs-6" 
+                                       step="0.50" 
+                                       min="1" 
+                                       max="{{ '%.2f'|format(saldo) }}" 
+                                       value="{{ '%.2f'|format(saldo) }}">
+                                <button onclick="pagarConMercadoPago('{{ pedido.id }}', this)" 
+                                        class="btn btn-sm text-white shadow-sm" 
+                                        style="background-color: #009ee3; font-weight: 600;">
+                                    <i class="bi bi-credit-card"></i> Pagar Adelanto
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     
                     <div class="text-muted small mb-3 d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-calendar3"></i> {{ pedido.fecha.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                        <!-- Aplicación del filtro de Hora de Lima -->
+                        <span><i class="bi bi-calendar3"></i> {{ pedido.fecha|lima_time }}</span>
+                        {% set saldo = pedido.total_pagado - pedido.adelanto %}
                         {% if saldo <= 0 %}
                             <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-all"></i> Pagado al 100%</span>
                         {% else %}
@@ -79,7 +99,7 @@
                         {% endif %}
                     </div>
 
-                    <!-- Botón de chat y validaciones originales -->
+                    <!-- Botón de chat y observaciones -->
                     <div class="mt-3 border-top pt-3">
                         {% set chat_ped = mensajes.get(pedido.id, []) %}
                         
@@ -116,7 +136,7 @@
                                             </div>
                                         {% endif %}
                                         
-                                        <small class="d-block {% if msg.remitente_rol == 'administrador' %}text-muted{% else %}text-white-50{% endif %}" style="font-size: 0.65rem;">{{ msg.fecha.strftime('%d/%m %H:%M') }}</small>
+                                        <small class="d-block {% if msg.remitente_rol == 'administrador' %}text-muted{% else %}text-white-50{% endif %}" style="font-size: 0.65rem;">{{ msg.fecha|lima_time }}</small>
                                     </div>
                                 {% else %}
                                     <p class="text-muted text-center small my-3">Sin observaciones ni aclaraciones aún.</p>
@@ -162,25 +182,30 @@
     </div>
 </div>
 
-<!-- Lógica de Petición al Backend para Mercado Pago -->
 <script>
     function pagarConMercadoPago(pedidoId, btnElement) {
-        // Cambiar el estado del botón a cargando
+        const inputMonto = document.getElementById(`montoPago${pedidoId}`);
+        const monto = inputMonto ? parseFloat(inputMonto.value) : null;
+
+        if (!monto || monto <= 0) {
+            alert('Por favor, ingrese un monto válido mayor a S/ 0.00');
+            return;
+        }
+
         const originalText = btnElement.innerHTML;
-        btnElement.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Redirigiendo...';
+        btnElement.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Cargando...';
         btnElement.disabled = true;
 
-        // Pedirle al backend que genere la URL de pago
         fetch(`/api/crear_preferencia_mp/${pedidoId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ monto: monto })
         })
         .then(response => response.json())
         .then(data => {
             if (data.init_point) {
-                // Redirigir al cliente a la ventana segura de Mercado Pago
                 window.location.href = data.init_point;
             } else {
                 alert('Error al procesar: ' + (data.error || 'Intente nuevamente más tarde.'));

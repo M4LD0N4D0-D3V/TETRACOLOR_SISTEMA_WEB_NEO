@@ -3,76 +3,109 @@
 <div class="container py-5">
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">Catálogo</a></li>
+            <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-success">Catálogo</a></li>
+            
+            <!-- Enlace intermedio hacia la categoría del producto -->
+            {% if producto.categoria %}
+            <li class="breadcrumb-item">
+                <a href="/categoria/{{ producto.id_categoria }}" class="text-decoration-none text-success">
+                    {{ producto.categoria.nombre }}
+                </a>
+            </li>
+            {% endif %}
+            
             <li class="breadcrumb-item active" aria-current="page">{{ producto.nombre_producto }}</li>
         </ol>
     </nav>
 
     <div class="card shadow border-0 rounded-4 overflow-hidden mb-5">
         <div class="row g-0">
+            <!-- COLUMNA IZQUIERDA: IMAGEN Y DESCRIPCIÓN (SEGÚN BOCETO) -->
             <div class="col-md-6">
-                <img src="{{ producto.imagen if producto.imagen else 'https://via.placeholder.com/600x500?text=Sin+Imagen' }}" class="img-fluid w-100 h-100" style="object-fit: cover; min-height: 500px;" alt="{{ producto.nombre_producto }}">
+                <img src="{{ producto.imagen if producto.imagen else 'https://via.placeholder.com/600x500?text=Sin+Imagen' }}" class="img-fluid w-100" style="object-fit: cover; min-height: 400px;" alt="{{ producto.nombre_producto }}">
+                
+                <div class="p-4 bg-light border-top">
+                    <h5 class="fw-bold">Descripción del Servicio:</h5>
+                    <p class="text-muted mb-0">
+                        {{ producto.descripcion if producto.descripcion else 'Servicio profesional garantizado por TETRACOLOR.' }}
+                    </p>
+                </div>
             </div>
             
+            <!-- COLUMNA DERECHA: FORMULARIO (SEGÚN BOCETO) -->
             <div class="col-md-6 bg-white p-5 d-flex flex-column justify-content-center">
+                
+                <!-- Banderín de Precio al Mayor -->
+                {% if producto.precio_mayor and producto.precio_mayor > 0 %}
+                <div class="alert alert-success py-2 mb-3 fw-bold small text-center rounded-pill">
+                    <i class="bi bi-tag-fill"></i> ¡Lleva {{ producto.cantidad_minima_mayor }} o más unidades a S/ {{ "%.2f"|format(producto.precio_mayor) }} c/u!
+                </div>
+                {% endif %}
+
                 <h1 class="fw-bold mb-2">{{ producto.nombre_producto }}</h1>
-                <p class="text-muted mb-4">Personaliza los materiales y genera tu cotización al instante.</p>
+                <p class="text-muted mb-4">Personaliza los materiales y genera tu cotización.</p>
                 
                 <form action="/crear_pedido_cliente" method="POST" enctype="multipart/form-data">
-    
                     <input type="hidden" name="id_producto" value="{{ producto.id }}">
                     
-                    <div class="mb-3 mt-3">
+                    <!-- Mostrar Precio Dinámico -->
+                    <h3 class="text-danger fw-bold mb-4" id="precio_mostrar">
+                        S/ {{ "%.2f"|format(producto.precio) }}
+                        <small class="text-muted fs-6 fw-normal">(Precio Unitario)</small>
+                    </h3>
+
+                    <!-- DIBUJAR SELECTORES DINÁMICOS SEGÚN LA CATEGORÍA DEL PRODUCTO -->
+                    <div id="contenedor_materiales">
+                        {% for tipo, opciones in opciones_agrupadas.items() %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-dark">{{ tipo }}:</label>
+                            <select name="variacion_{{ tipo|replace(' ', '_')|lower }}" class="form-select border-dark variacion-select" required>
+                                <option value="" disabled selected>-- Selecciona un/a {{ tipo }} --</option>
+                                
+                                {% for op in opciones %}
+                                    <option value="{{ op.nombre }}" data-costo="{{ op.costo_extra }}">
+                                        {{ op.nombre }} 
+                                        {% if op.costo_extra > 0 %} (+ S/ {{ "%.2f"|format(op.costo_extra) }}) {% endif %}
+                                    </option>
+                                {% endfor %}
+                                
+                            </select>
+                        </div>
+                        {% else %}
+                            <!-- Si el producto no requiere materiales extra, mostramos un mensaje o lo dejamos en blanco -->
+                            <div class="alert alert-light text-muted small">Este producto no requiere configuración de materiales.</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
                         <label for="imagen_diseno" class="form-label fw-bold">Adjuntar Diseño / Logo (Opcional):</label>
                         <input class="form-control" type="file" id="imagen_diseno" name="imagen_diseno" accept="image/png, image/jpeg, image/jpg, application/pdf">
-                        <div class="form-text">Formatos permitidos: JPG, PNG, PDF.</div>
-                    </div>
-                    
-                    <h3 class="text-danger fw-bold mb-4">S/ {{ producto.precio }} <small class="text-muted fs-6 fw-normal">(Precio base de referencia)</small></h3>
-
-                    <div class="mb-4">
-                        <label class="form-label fw-bold text-dark">¿En qué material lo necesitas?</label>
-                        
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" name="material" value="Nylon" id="m1" checked required>
-                            <label class="form-check-label" for="m1">Nylon (Estándar)</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" name="material" value="Satén/Raso" id="m2">
-                            <label class="form-check-label" for="m2">Satén/Raso (Elegante y suave)</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" name="material" value="Algodón" id="m3">
-                            <label class="form-check-label" for="m3">Algodón Hilera</label>
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" name="material" value="Transfer" id="m4">
-                            <label class="form-check-label" for="m4">Transfer Industrial</label>
-                        </div>
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Instrucciones Adicionales o Medidas:</label>
-                        <textarea name="notas" class="form-control" rows="3" placeholder="Ej: Medida 5x5cm, logo en el centro, colores blanco y negro..."></textarea>
+                        <label class="form-label fw-bold">Instrucciones / Notas:</label>
+                        <textarea name="notas" class="form-control" rows="2" placeholder="Ej: Logo de 5x5cm en el pecho..."></textarea>
                     </div>
 
                     <div class="mb-4 row align-items-center">
                         <div class="col-auto">
-                            <label class="form-label fw-bold mb-0">Cantidad requerida:</label>
+                            <label class="form-label fw-bold mb-0">Cantidad:</label>
                         </div>
                         <div class="col-4">
-                            <input type="number" name="cantidad" class="form-control text-center fw-bold border-dark" value="1" min="1" required>
+                            <input type="number" name="cantidad" id="input_cantidad" class="form-control text-center fw-bold border-dark" value="1" min="1" required>
+                        </div>
+                        <div class="col-auto">
+                            <h5 class="fw-bold text-success mb-0" id="total_mostrar">Total: S/ {{ "%.2f"|format(producto.precio) }}</h5>
                         </div>
                     </div>
 
                     <div class="mt-4">
-                        {% if session.usuario_id %}
+                        {% if 'usuario_id' in session %}
                             <button type="submit" class="btn btn-tetra-green w-100 py-3 fw-bold fs-5 text-white shadow-sm" style="background-color: #198754;">
-                                <i class="bi bi-cart-check"></i> GENERAR PEDIDO / COTIZACIÓN
+                                GENERAR PEDIDO
                             </button>
                         {% else %}
                             <div class="alert alert-light border text-center">
-                                <p class="mb-2 text-muted">Debes estar registrado para solicitar cotizaciones.</p>
                                 <a href="/login" class="btn btn-dark w-100 fw-bold">Iniciar Sesión para Pedir</a>
                             </div>
                         {% endif %}
@@ -82,4 +115,36 @@
         </div>
     </div>
 </div>
+
+<!-- SCRIPT PARA CALCULAR PRECIO DINÁMICO EN TIEMPO REAL -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const inputCantidad = document.getElementById("input_cantidad");
+    const precioMostrar = document.getElementById("precio_mostrar");
+    const totalMostrar = document.getElementById("total_mostrar");
+
+    // Variables inyectadas desde el Backend
+    const precioUnitario = parseFloat("{{ producto.precio }}");
+    const precioMayor = parseFloat("{{ producto.precio_mayor or producto.precio }}");
+    const minMayor = parseInt("{{ producto.cantidad_minima_mayor or 12 }}");
+
+    inputCantidad.addEventListener("input", function() {
+        let cantidad = parseInt(this.value) || 1;
+        let precioAplicado = precioUnitario;
+        let tipoPrecio = "(Precio Unitario)";
+
+        // Lógica de Descuento por Mayor
+        if (precioMayor > 0 && cantidad >= minMayor) {
+            precioAplicado = precioMayor;
+            tipoPrecio = "<span class='text-success'>(¡Precio al por Mayor Aplicado!)</span>";
+        }
+
+        let total = precioAplicado * cantidad;
+
+        // Actualizar la interfaz
+        precioMostrar.innerHTML = `S/ ${precioAplicado.toFixed(2)} <small class="fs-6 fw-normal">${tipoPrecio}</small>`;
+        totalMostrar.innerHTML = `Total: S/ ${total.toFixed(2)}`;
+    });
+});
+</script>
 {% endblock %}

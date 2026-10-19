@@ -109,3 +109,10 @@
     color: white;
     transform: translateY(-2px);
 }
+
+/* Limitar el ancho máximo de la web en pantallas gigantes */
+.main-container {
+    max-width: 1140px !important;
+    margin-left: auto;
+    margin-right: auto;
+}

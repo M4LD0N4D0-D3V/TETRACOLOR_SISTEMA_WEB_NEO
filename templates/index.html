@@ -1,114 +1,218 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<!-- HERO BANNER -->
-<div class="position-relative bg-dark text-white overflow-hidden mb-5 shadow-lg">
-    <img src="{{ url_for('static', filename='assets/logo/bann.jpg') }}" alt="TETRACOLOR Banner" class="w-100 opacity-40" style="height: 340px; object-fit: cover;">
-    <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center text-center p-4" style="background: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.75));">
-        <h1 class="display-3 fw-bold text-success text-shadow mb-2">Estampados y Etiquetas</h1>
-        <p class="lead fs-4 text-light">Calidad, innovación y rapidez para tus prendas de vestir.</p>
-        <a href="#catalogo" class="btn btn-success btn-lg rounded-pill px-4 mt-2 fw-bold shadow">
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
+    
+    .text-cinematic { 
+        font-family: 'Montserrat', sans-serif; 
+    }
+
+    /* Banner Principal de Ancho Completo */
+    .hero-banner-wrapper {
+        width: 100vw;
+        position: relative;
+        left: 50%;
+        right: 50%;
+        margin-left: -50vw;
+        margin-right: -50vw;
+        height: 380px;
+        background-color: #000;
+        overflow: hidden;
+    }
+
+    .hero-banner-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.45;
+    }
+
+    .hero-banner-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.8) 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-center;
+        padding: 2rem;
+    }
+
+    /* Grilla Bento Responsiva */
+    .bento-grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        grid-auto-rows: 280px;
+        gap: 1.25rem;
+    }
+
+    .bento-item {
+        border-radius: 16px;
+        overflow: hidden;
+        position: relative;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 2rem;
+        background-color: #111111;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        grid-column: span 4;
+    }
+
+    .bento-item:nth-child(1) { grid-column: span 8; } 
+    .bento-item:nth-child(2) { grid-column: span 4; }
+    .bento-item:nth-child(3) { grid-column: span 5; }
+    .bento-item:nth-child(4) { grid-column: span 7; }
+
+    @media (max-width: 991px) {
+        .bento-item, 
+        .bento-item:nth-child(1), 
+        .bento-item:nth-child(2), 
+        .bento-item:nth-child(3), 
+        .bento-item:nth-child(4) {
+            grid-column: span 12;
+            grid-auto-rows: 240px;
+        }
+    }
+
+    .bento-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .bento-bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.6;
+        transition: opacity 0.4s ease, transform 0.6s ease;
+        z-index: 1;
+    }
+
+    .bento-item:hover .bento-bg {
+        opacity: 0.85;
+        transform: scale(1.04);
+    }
+
+    .bento-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);
+        z-index: 2;
+    }
+
+    .bento-content {
+        position: relative;
+        z-index: 3;
+    }
+
+    .bento-title {
+        color: #ffffff !important;
+        font-weight: 800;
+        font-size: 1.6rem;
+        line-height: 1.1;
+        margin-bottom: 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: -0.5px;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    }
+
+    .bento-desc {
+        color: #e0e0e0 !important;
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .btn-bento {
+        align-self: flex-start;
+        background-color: transparent;
+        color: #ffffff;
+        border: 2px solid rgba(255,255,255,0.6);
+        padding: 0.4rem 1.2rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+    }
+
+    .bento-item:hover .btn-bento {
+        background-color: #198754; 
+        border-color: #198754;
+        box-shadow: 0 0 15px rgba(25, 135, 84, 0.5);
+    }
+</style>
+
+<!-- HERO BANNER BORDE A BORDE -->
+<div class="hero-banner-wrapper text-cinematic mb-5">
+    <img src="{{ url_for('static', filename='assets/logo/bann.jpg') }}" alt="TETRACOLOR Banner" class="hero-banner-img">
+    <div class="hero-banner-overlay">
+        <h1 class="display-4 fw-bold text-success text-shadow mb-2">Estampados y Etiquetas</h1>
+        <p class="lead fs-5 text-light mb-3">Calidad, innovación y rapidez para tus prendas de vestir.</p>
+        <a href="#catalogo" class="btn btn-success btn-lg rounded-pill px-5 fw-bold shadow-sm">
             Ver Catálogo de Servicios
         </a>
     </div>
 </div>
 
-<div class="container" id="catalogo">
-
+<div class="container text-cinematic py-2" id="catalogo">
     <div class="text-center mb-5">
-        <h2 class="fw-bold display-6 text-uppercase tracking-wider">CATÁLOGO DE SERVICIOS</h2>
-        <div class="mx-auto bg-success rounded" style="width: 80px; height: 4px;"></div>
+        <h2 class="fw-bold display-6 text-uppercase text-dark mb-2">Catálogo de Servicios</h2>
+        <div class="mx-auto bg-success rounded" style="width: 60px; height: 4px;"></div>
     </div>
 
-    <!-- GRILLA DE PRODUCTOS -->
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-2 g-4">
-        {% for p in productos %}
-        <div class="col">
-            <a href="/producto/{{ p.id }}" class="text-decoration-none">
-                <div class="card card-large-product">
-                    
-                    <!-- IMAGEN CON DESCRIPCIÓN EN HOVER -->
-                    <div class="card-img-large-wrapper">
-                        
-                        <!-- Overlay Superior de Categoría -->
-                        <div class="card-top-title-overlay">
-                            {% if 'Polos' in p.nombre_producto %}
-                                POLOS PUBLICITARIOS
-                            {% elif 'Relieve' in p.nombre_producto %}
-                                ESTAMPADO 3D HIGH DENSITY
-                            {% elif 'Brillo' in p.nombre_producto %}
-                                ACABADOS METALIZADOS & GLITTER
-                            {% else %}
-                                SERVICIO DE IMPRENTA
-                            {% endif %}
-                        </div>
-
-                        <!-- OVERLAY DESCRIPCIÓN COMPLETA AL PASAR EL CURSOR -->
-                        <div class="card-desc-overlay">
-                            <h6 class="text-success fw-bold text-uppercase mb-2">
-                                <i class="bi bi-info-circle me-1"></i>Detalles del Servicio
-                            </h6>
-                            <p class="small text-light mb-0" style="line-height: 1.5; font-size: 0.9rem;">
-                                {% if p.descripcion %}
-                                    {{ p.descripcion|striptags }}
-                                {% else %}
-                                    Servicio profesional de estampado y confección con acabados de alta calidad para producción textil.
-                                {% endif %}
-                            </p>
-                        </div>
-
-                        {% if p.imagen %}
-                            <img src="{{ p.imagen }}" alt="{{ p.nombre_producto }}">
-                        {% else %}
-                            <div class="w-100 h-100 d-flex align-items-center justify-content-center text-white bg-secondary fs-4">Sin Imagen</div>
-                        {% endif %}
-                    </div>
-
-                    <!-- BARRA INFERIOR -->
-                    <div class="card-bottom-bar">
-                        <div class="card-info-left">
-                            <span class="brand-name">TETRACOLOR</span>
-                            <h3 class="product-name">{{ p.nombre_producto }}</h3>
-                        </div>
-
-                        <div class="card-price-block">
-                            {% if p.precio > 0 %}
-                                <span class="price-main">S/{{ "%.2f"|format(p.precio) }}</span>
-                                <span class="price-sub">P. Cotización</span>
-                            {% else %}
-                                <span class="price-main">Cotizar</span>
-                                <span class="price-sub">Ver Detalles</span>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                </div>
-            </a>
-        </div>
+    <!-- GRILLA BENTO CON IMÁGENES DE FONDO -->
+    <div class="bento-grid mb-5">
+        {% for c in categorias %}
+        <a href="/categoria/{{ c.id }}" class="bento-item shadow-sm">
+            {% if c.imagen %}
+                <img src="{{ c.imagen }}" alt="{{ c.nombre }}" class="bento-bg">
+            {% else %}
+                <img src="https://images.unsplash.com/photo-1562157873-818bc0726f68?auto=format&fit=crop&q=80&w=800" alt="{{ c.nombre }}" class="bento-bg">
+            {% endif %}
+            
+            <div class="bento-overlay"></div>
+            
+            <div class="bento-content">
+                <h3 class="bento-title">{{ c.nombre }}</h3>
+                {% if c.descripcion %}
+                    <p class="bento-desc">{{ c.descripcion }}</p>
+                {% endif %}
+                <span class="btn-bento">Explorar <i class="bi bi-arrow-right ms-1"></i></span>
+            </div>
+        </a>
         {% endfor %}
     </div>
 
-    <!-- SECCIÓN UBÍCANOS EN HUANCAYO -->
-    <div id="ubicacion" class="my-5 pt-4">
-        <div class="card border-0 rounded-4 shadow-sm bg-white overflow-hidden">
+    <!-- SECCIÓN UBÍCANOS -->
+    <div id="ubicacion" class="my-5 py-4 border-top">
+        <div class="card border-0 rounded-4 shadow bg-white overflow-hidden">
             <div class="card-body p-4 p-md-5">
                 <div class="row align-items-center">
                     <div class="col-md-2 text-center mb-3 mb-md-0">
-                        <div class="bg-success text-white p-3 rounded-circle d-inline-block">
+                        <div class="bg-success text-white p-3 rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
                             <i class="bi bi-geo-alt-fill display-5"></i>
                         </div>
                     </div>
                     <div class="col-md-10">
-                        <span class="badge bg-dark mb-2">SEDE PRINCIPAL - HUANCAYO</span>
+                        <span class="badge bg-dark mb-2 py-2 px-3 fw-semibold">SEDE PRINCIPAL - HUANCAYO</span>
                         <h4 class="fw-bold mb-1">Galería Industriales Wanka</h4>
-                        <p class="text-muted mb-1">Prolongación Ica 137, Stand 22 - 3er Nivel</p>
-                        <p class="small text-secondary mb-0">Atención de Lunes a Sábado de 8:00 AM a 7:30 PM para muestras físicas de acabados y pedidos masivos.</p>
+                        <p class="text-secondary mb-1">Prolongación Ica 137, Stand 22 - 3er Nivel</p>
+                        <p class="small text-muted mb-0">Atención de Lunes a Sábado de 8:00 AM a 7:30 PM para muestras físicas de acabados y pedidos masivos.</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 
 {% endblock %}
