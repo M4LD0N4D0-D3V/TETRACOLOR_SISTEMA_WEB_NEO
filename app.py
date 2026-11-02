@@ -490,6 +490,10 @@ def registro():
         if Usuario.query.filter_by(correo=correo).first() or Usuario.query.filter_by(documento=documento).first():
             flash("El correo o el documento ya están registrados.", "danger")
             return redirect(url_for("registro"))
+
+        if Usuario.query.filter_by(telefono=telefono).first():
+            flash("Este número de teléfono ya se encuentra registrado por otro cliente.", "danger")
+            return redirect(url_for("registro"))
             
         pw_hash = bcrypt.generate_password_hash(clave).decode('utf-8')
         
@@ -562,11 +566,12 @@ def registro_presencial():
             return redirect(url_for("registro_presencial"))
 
         # --- VALIDAR DUPLICADOS ---
-        existe_correo = Usuario.query.filter_by(correo=correo).first()
-        existe_documento = Usuario.query.filter_by(documento=documento).first()
-
-        if existe_correo or existe_documento:
+        if Usuario.query.filter_by(correo=correo).first() or Usuario.query.filter_by(documento=documento).first():
             flash("El correo o documento ya se encuentran registrados.", "danger")
+            return redirect(url_for("registro_presencial"))
+
+        if Usuario.query.filter_by(telefono=telefono).first():
+            flash("Este número de teléfono ya se encuentra registrado por otro cliente.", "danger")
             return redirect(url_for("registro_presencial"))
 
         # --- CONTRASEÑA POR DEFECTO ---
@@ -1120,6 +1125,7 @@ def guardar_producto():
     nombre = request.form.get('nombre_producto')
     precio = request.form.get('precio')
     id_categoria = request.form.get('id_categoria')
+    descripcion = request.form.get('descripcion') # <-- CAMBIO AÑADIDO
     imagen = request.files.get('imagen')
     
     if nombre and precio and id_categoria:
@@ -1139,6 +1145,7 @@ def guardar_producto():
             nombre_producto=nombre, 
             precio=float(precio),
             id_categoria=int(id_categoria),
+            descripcion=descripcion, # <-- CAMBIO AÑADIDO
             imagen=url_imagen_publica
         )
         db.session.add(nuevo_prod)
@@ -1162,12 +1169,14 @@ def editar_producto(id):
     nuevo_nombre = request.form.get('nombre_producto')
     nuevo_precio = request.form.get('precio')
     nueva_categoria = request.form.get('id_categoria')
+    nueva_descripcion = request.form.get('descripcion') # <-- CAMBIO AÑADIDO
     nueva_imagen = request.files.get('imagen')
     
     if nuevo_nombre and nuevo_precio and nueva_categoria:
         producto.nombre_producto = nuevo_nombre
         producto.precio = float(nuevo_precio)
         producto.id_categoria = int(nueva_categoria)
+        producto.descripcion = nueva_descripcion # <-- CAMBIO AÑADIDO
         
         # Subir la nueva imagen a Supabase solo si el administrador subió una nueva
         if nueva_imagen and nueva_imagen.filename != '':

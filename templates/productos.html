@@ -98,7 +98,10 @@
                                                         <label class="form-label text-muted small fw-bold">Nombre del Producto</label>
                                                         <input type="text" name="nombre_producto" class="form-control" value="{{ prod.nombre_producto }}" required>
                                                     </div>
-                                                    
+                                                    <div class="mb-3">
+                                                        <label class="form-label text-muted small fw-bold">Descripción</label>
+                                                        <textarea name="descripcion" class="form-control" rows="3">{{ prod.descripcion }}</textarea>
+                                                    </div>
                                                     <div class="mb-3">
                                                         <label class="form-label text-muted small fw-bold">Categoría</label>
                                                         <select name="id_categoria" class="form-select">
@@ -162,7 +165,10 @@
                         <label class="form-label text-muted small fw-bold">Nombre del Producto o Servicio</label>
                         <input type="text" name="nombre_producto" class="form-control" placeholder="Ej. Tarjetas de Presentación Millar" required>
                     </div>
-
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Descripción</label>
+                        <textarea name="descripcion" class="form-control" rows="3" placeholder="Ingresa los detalles del producto..."></textarea>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label text-muted small fw-bold">Categoría</label>
                         <select name="id_categoria" class="form-select" required>

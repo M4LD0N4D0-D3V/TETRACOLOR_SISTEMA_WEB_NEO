@@ -22,18 +22,7 @@
             <h3 class="fw-bold mb-1" style="color: var(--tetra-dark);">Crea tu cuenta</h3>
             <p class="text-muted mb-4 small">Completa tus datos para registrarte en nuestro sistema.</p>
             
-            <!-- Mostrar errores globales (ej. Correo duplicado) si existen -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show small py-2" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem;"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
+            
             <form action="/registro" method="POST" id="formRegistro">
                 
                 <!-- DIVISIÓN EN DOS COLUMNAS PARA REDUCIR ALTURA -->
