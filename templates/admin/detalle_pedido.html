@@ -140,7 +140,7 @@
                                     </div>
                                 {% endif %}
                                 <small class="d-block {% if msg.remitente_rol == 'administrador' %}text-white-50{% else %}text-muted{% endif %}" style="font-size: 0.65rem;">
-                                    {{ msg.fecha | lima_time if msg.fecha else '' }}
+                                    {{ msg.fecha.strftime('%d/%m/%Y %H:%M') if msg.fecha else '' }}
                                 </small>
                             </div>
                         {% else %}
