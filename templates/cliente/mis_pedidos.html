@@ -135,10 +135,15 @@
                             {% endif %}
                         </div>
                         
-                        <!-- BOTÓN DE COMPROBANTE -->
-                        <a href="/pedido/{{ pedido.id }}/comprobante" class="btn btn-sm btn-outline-secondary rounded-pill shadow-sm" target="_blank" title="Imprimir o descargar comprobante">
-                            <i class="bi bi-receipt"></i> Ver Comprobante
-                        </a>
+                        <!-- BOTONES DE COMPROBANTE Y FACTURA -->
+                        <div class="d-flex gap-2 justify-content-end align-items-center flex-wrap mt-2">
+                            <a href="/pedido/{{ pedido.id }}/comprobante" class="btn btn-sm btn-outline-secondary rounded-pill shadow-sm" target="_blank" title="Ver ticket de pagos y adelantos">
+                                <i class="bi bi-receipt"></i> Ticket de Pago
+                            </a>
+                            <a href="/pedido/{{ pedido.id }}/factura" class="btn btn-sm btn-outline-success rounded-pill shadow-sm" target="_blank" title="Ver comprobante electrónico">
+                                <i class="bi bi-file-earmark-pdf"></i> Boleta / Factura
+                            </a>
+                        </div>
                     </div>
 
                     <!-- Botón de chat y observaciones -->
@@ -172,8 +177,8 @@
                                         
                                         {% if msg.archivo_adjunto %}
                                             <div class="mt-2 mb-1">
-                                                <a href="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" target="_blank" class="d-inline-block border rounded overflow-hidden shadow-sm">
-                                                    <img src="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" alt="Adjunto" style="max-width: 150px; max-height: 150px; object-fit: cover;">
+                                                <a href="{{ msg.archivo_adjunto }}" target="_blank" class="d-inline-block border rounded overflow-hidden shadow-sm">
+                                                    <img src="{{ msg.archivo_adjunto }}" alt="Adjunto" style="max-width: 150px; max-height: 150px; object-fit: cover;">
                                                 </a>
                                             </div>
                                         {% endif %}

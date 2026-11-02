@@ -27,17 +27,15 @@
                         <tr style="cursor: pointer;" onclick="window.location.href='/admin/pedido/{{ pedido.id }}'">
                             <td class="ps-4 fw-bold text-muted">#{{ pedido.id }}</td>
                             
-                            <!-- FECHA CORREGIDA EN FORMATO DIA/MES/AÑO -->
+                            <!-- FORMATO DE FECHA LIMA -->
                             <td class="text-nowrap">
                                 {{ pedido.fecha | lima_time }}
                             </td>
                             
-                            <!-- CORRECCIÓN: Variable correcta según tu SQL -->
                             <td class="text-nowrap"><strong>{{ pedido.cliente }}</strong></td>
                             
                             <td>{{ pedido.producto }}</td>
                             <td class="text-nowrap">
-                                <!-- NUEVO: Usando clases CSS Mate -->
                                 {% if pedido.estado == 'Pendiente' %}
                                     <span class="badge badge-mate-pendiente py-2 px-3 rounded-pill shadow-sm"><i class="bi bi-box"></i> Pendiente</span>
                                 {% elif pedido.estado == 'En Proceso' %}
@@ -56,7 +54,6 @@
                                         <i class="bi bi-whatsapp"></i>
                                     </a>
                                     {% endif %}
-                                    <!-- Botón gestionar con clase mate personalizada -->
                                     <a href="/admin/pedido/{{ pedido.id }}" class="btn btn-sm btn-mate-gestionar fw-bold shadow-sm px-3">
                                         Gestionar <i class="bi bi-arrow-right-short"></i>
                                     </a>
@@ -74,7 +71,6 @@
                 </table>
             </div>
             
-            <!-- Paginación con margen superior añadido desde CSS y HTML -->
             <div class="mb-4 d-flex justify-content-center">
                 {% include 'paginacion.html' %}
             </div>

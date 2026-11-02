@@ -25,11 +25,17 @@ from db import CategoriaProducto, VariacionMaterial
 from werkzeug.exceptions import RequestEntityTooLarge
 from zoneinfo import ZoneInfo
 from io import BytesIO
+from supabase import create_client, Client
 
 
 app = Flask(__name__)
 
 app.secret_key = os.getenv("SECRET_KEY", "clave_por_defecto_respaldo")
+
+# Configuración de Supabase Storage
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
 
 # Configurar Zona Horaria de Lima
 LIMA_TZ = ZoneInfo("America/Lima")
@@ -205,22 +211,23 @@ def admin_required(f):
 
 
 # ==========================================
-# CONFIGURACIÓN DE SUBIDA DE ARCHIVOS
+# CONFIGURACIÓN DE SUBIDA DE ARCHIVOS (RUTAS ABSOLUTAS)
 # ==========================================
-# Carpeta donde se guardarán las imágenes
-UPLOAD_FOLDER = 'static/uploads/disenos'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-# Limitar el tamaño a 5MB por seguridad
-app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
+# Se usa app.root_path para garantizar que la carpeta siempre se cree dentro de tu proyecto
+UPLOAD_FOLDER_DISENOS = os.path.join(app.root_path, 'static', 'uploads', 'disenos')
+UPLOAD_FOLDER_MENSAJES = os.path.join(app.root_path, 'static', 'uploads', 'mensajes')
 
-# Crear la carpeta si no existe
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER_DISENOS
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
+
+# Crear las subcarpetas físicas automáticamente dentro del proyecto si no existen
+os.makedirs(UPLOAD_FOLDER_DISENOS, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER_MENSAJES, exist_ok=True)
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf', 'ai', 'cdr', 'zip'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
 
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_size_error(e):
@@ -354,7 +361,7 @@ def detalle_producto(id):
 @app.route("/crear_pedido_cliente", methods=["POST"])
 @login_required
 def crear_pedido_cliente():
-    # 1. Obtener ID de usuario desde Flask-Login
+    # 1. Obtener ID de usuario y parámetros del formulario
     id_usuario = session.get('usuario_id')
     id_producto = request.form.get("id_producto")
     cantidad = request.form.get("cantidad", 1, type=int)
@@ -368,36 +375,35 @@ def crear_pedido_cliente():
     
     especificaciones = f"Material: {material} | Notas: {notas}"
     
-    # 2. Manejo Seguro de la Imagen del Diseño
-    nombre_archivo = None
-    if 'imagen_diseno' in request.files:
-        file = request.files['imagen_diseno']
-        if file and file.filename != '':
-            if allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # Generamos un nombre único con timestamp + UUID para evitar colisiones
-                nombre_archivo = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:6]}_{filename}"
-                ruta_guardado = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
-                file.save(ruta_guardado)
-            else:
-                flash("Formato de imagen no permitido. Usa JPG, PNG o PDF.", "danger")
+    # 2. Manejo Seguro de la Imagen del Diseño (usando la función auxiliar para Supabase)
+    url_imagen_publica = None
+    file = request.files.get('imagen_diseno')
+    
+    if file and file.filename != '':
+        if allowed_file(file.filename):
+            try:
+                # Sube a la carpeta 'disenos' dentro de Supabase Storage
+                url_imagen_publica = subir_a_supabase(file, carpeta="disenos")
+            except Exception as e:
+                print(f"Error al subir imagen a Supabase: {e}")
+                flash("Hubo un problema al subir la imagen al servidor. Intenta nuevamente.", "danger")
                 return redirect(request.referrer or url_for('index'))
+        else:
+            flash("Formato de imagen no permitido. Usa JPG, PNG o PDF.", "danger")
+            return redirect(request.referrer or url_for('index'))
 
     # 3. Inserción con SQLAlchemy ORM
     try:
-        # Instanciar el nuevo pedido
         nuevo_pedido = Pedido(
             id_usuario=id_usuario,
             id_producto=id_producto,
             cantidad=cantidad,
             especificaciones=especificaciones,
-            archivo_diseno=nombre_archivo,
+            archivo_diseno=url_imagen_publica, 
             estado='Pendiente',
             fecha_sugerida=fecha_sugerida
         )
         db.session.add(nuevo_pedido)
-        
-        # db.session.flush() genera el ID autoincrementable de 'nuevo_pedido' sin cerrar la transacción
         db.session.flush() 
 
         # 4. Registrar Pago/Adelanto si existe un monto
@@ -405,7 +411,6 @@ def crear_pedido_cliente():
             try:
                 monto_pago = float(monto_pago_raw)
                 if monto_pago > 0:
-                    # Buscar el ID del método de pago dinámicamente
                     mp = MetodoPago.query.filter(MetodoPago.nombre.ilike(metodo_pago_nombre)).first()
                     mp_id = mp.id if mp else None
 
@@ -417,14 +422,12 @@ def crear_pedido_cliente():
                     )
                     db.session.add(pago)
 
-                    # Actualizamos los montos acumulados en la entidad Pedido
                     nuevo_pedido.adelanto = monto_pago
                     nuevo_pedido.total_pagado = monto_pago
 
             except ValueError:
                 flash("El monto de pago ingresado no es un número válido.", "warning")
 
-        # Confirmamos la transacción completa
         db.session.commit()
         return redirect(url_for('pedido_exitoso', id=nuevo_pedido.id))
 
@@ -432,9 +435,7 @@ def crear_pedido_cliente():
         db.session.rollback()
         print(f"Error al registrar pedido/pago: {e}")
         flash("Ocurrió un error al procesar el pedido.", "danger")
-        # request.referrer redirige al formulario anterior en lugar de la misma ruta POST
         return redirect(request.referrer or url_for('index'))
-
 
 @app.route("/pedido_exitoso/<int:id>")
 @login_required
@@ -1122,33 +1123,27 @@ def guardar_producto():
     imagen = request.files.get('imagen')
     
     if nombre and precio and id_categoria:
-        ruta_imagen_db = None
+        url_imagen_publica = None
         
-        # Procesar y guardar la imagen si existe
+        # Subir imagen del producto a Supabase (carpeta 'productos')
         if imagen and imagen.filename != '':
-            filename = secure_filename(imagen.filename)
-            # Definir la carpeta destino
-            carpeta_destino = os.path.join(app.root_path, 'static', 'uploads', 'productos')
-            # Crear la carpeta si no existe
-            os.makedirs(carpeta_destino, exist_ok=True)
-            
-            # Guardar físicamente el archivo
-            ruta_guardado = os.path.join(carpeta_destino, filename)
-            imagen.save(ruta_guardado)
-            
-            # Ruta que se guardará en la base de datos
-            ruta_imagen_db = f'/static/uploads/productos/{filename}'
+            try:
+                url_imagen_publica = subir_a_supabase(imagen, carpeta="productos")
+            except Exception as e:
+                print(f"Error al subir imagen de producto a Supabase: {e}")
+                flash("Hubo un error al subir la imagen del producto.", "danger")
+                return redirect('/productos')
 
-        # Crear producto con categoría e imagen
+        # Guardar en base de datos la URL pública
         nuevo_prod = Producto(
             nombre_producto=nombre, 
             precio=float(precio),
             id_categoria=int(id_categoria),
-            imagen=ruta_imagen_db
+            imagen=url_imagen_publica
         )
         db.session.add(nuevo_prod)
         db.session.commit()
-        flash("Producto creado exitosamente.", "success")
+        flash("Producto creado exitosamente en la nube.", "success")
     else:
         flash("Datos inválidos. Asegúrate de completar todos los campos.", "danger")
         
@@ -1162,10 +1157,8 @@ def guardar_producto():
 @login_required
 @admin_required
 def editar_producto(id):
-    # Buscamos el producto en la base de datos
     producto = Producto.query.get_or_404(id)
     
-    # Actualizamos sus valores con los del formulario
     nuevo_nombre = request.form.get('nombre_producto')
     nuevo_precio = request.form.get('precio')
     nueva_categoria = request.form.get('id_categoria')
@@ -1176,17 +1169,15 @@ def editar_producto(id):
         producto.precio = float(nuevo_precio)
         producto.id_categoria = int(nueva_categoria)
         
-        # Procesar nueva imagen solo si el usuario subió una
+        # Subir la nueva imagen a Supabase solo si el administrador subió una nueva
         if nueva_imagen and nueva_imagen.filename != '':
-            filename = secure_filename(nueva_imagen.filename)
-            carpeta_destino = os.path.join(app.root_path, 'static', 'uploads', 'productos')
-            os.makedirs(carpeta_destino, exist_ok=True)
-            
-            ruta_guardado = os.path.join(carpeta_destino, filename)
-            nueva_imagen.save(ruta_guardado)
-            
-            # Actualizamos la ruta en la base de datos
-            producto.imagen = f'/static/uploads/productos/{filename}'
+            try:
+                url_imagen = subir_a_supabase(nueva_imagen, carpeta="productos")
+                if url_imagen:
+                    producto.imagen = url_imagen
+            except Exception as e:
+                print(f"Error al actualizar la imagen en Supabase: {e}")
+                flash("Error al subir la nueva imagen a Supabase.", "danger")
 
         db.session.commit()
         flash(f"El producto '{producto.nombre_producto}' fue modificado exitosamente.", "success")
@@ -1388,9 +1379,6 @@ def cambiar_clave():
         flash("Las claves no coinciden.", "danger")
     return render_template("cambiar_clave.html")
 
-import requests
-from flask import jsonify, request
-
 # ========================================================
 # --- SISTEMA DE MENSAJES Y CONSTATACIÓN DE PEDIDOS ---
 # ========================================================
@@ -1400,49 +1388,43 @@ def enviar_mensaje(id_pedido):
     mensaje = request.form.get('mensaje', '').strip()
     archivo = request.files.get('adjunto')
 
-    # 1. Determinar el rol actual seguro desde la sesión
     rol_actual = session.get('rol', 'cliente')
     if rol_actual not in ['administrador', 'asistente', 'consultor', 'cliente']:
         rol_actual = 'cliente'
 
-    # 2. Obtener el nombre del remitente
     remitente_nombre = session.get('nombre') or ('Administrador' if rol_actual != 'cliente' else 'Cliente')
 
-    # 3. Manejo seguro de subida de archivos
-    nombre_archivo = None
-    carpeta_destino = os.path.join('static', 'uploads', 'mensajes')
-    os.makedirs(carpeta_destino, exist_ok=True)
-
+    url_imagen_publica = None
     if archivo and archivo.filename != '':
         if allowed_file(archivo.filename):
-            filename = f"{int(time.time())}_{secure_filename(archivo.filename)}"
-            archivo.save(os.path.join(carpeta_destino, filename))
-            nombre_archivo = filename
+            try:
+                url_imagen_publica = subir_a_supabase(archivo, carpeta="mensajes")
+            except Exception as e:
+                print(f"Error al subir adjunto a Supabase: {e}")
+                flash('Hubo un problema al subir el archivo. Inténtalo de nuevo.', 'danger')
+                return redirect(request.referrer or url_for('pedidos'))
         else:
             flash('Tipo de archivo no permitido. Sube imágenes (PNG, JPG) o PDF.', 'danger')
             return redirect(request.referrer or url_for('pedidos'))
 
-    if not mensaje and not nombre_archivo:
+    if not mensaje and not url_imagen_publica:
         flash('Escribe un mensaje o adjunta un archivo/comprobante.', 'warning')
         return redirect(request.referrer or url_for('pedidos'))
 
-    # 4. Inserción en Base de Datos
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        # Verificación de seguridad: si es cliente, validar que el pedido le pertenezca
         if rol_actual == 'cliente':
             cursor.execute("SELECT id FROM pedido WHERE id = %s AND id_usuario = %s", (id_pedido, session.get('usuario_id')))
             if not cursor.fetchone():
                 flash('No tienes permiso para comentar en este pedido.', 'danger')
                 return redirect(url_for('mis_pedidos'))
 
-        # Inserción del mensaje
         cursor.execute("""
             INSERT INTO pedido_mensajes (id_pedido, mensaje, archivo_adjunto, remitente_rol, remitente_nombre, fecha)
             VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-        """, (id_pedido, mensaje, nombre_archivo, rol_actual, remitente_nombre))
+        """, (id_pedido, mensaje, url_imagen_publica, rol_actual, remitente_nombre))
 
         conn.commit()
         flash('Mensaje / Comprobante registrado correctamente en la bitácora.', 'success')
@@ -1454,9 +1436,39 @@ def enviar_mensaje(id_pedido):
         cursor.close()
         conn.close()
 
-    # Retorna a la vista anterior (sea la del cliente o la del administrador)
     return redirect(request.referrer or url_for('pedidos'))
 
+#############
+@app.route('/pedido/<int:id_pedido>/confirmar_fecha', methods=['POST'])
+@login_required
+def confirmar_fecha(id_pedido):
+    nueva_fecha = request.form.get('fecha_confirmada')
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Actualiza la fecha en la tabla de pedidos
+        cursor.execute("UPDATE pedido SET fecha_sugerida = %s WHERE id = %s", (nueva_fecha, id_pedido))
+        
+        # Insertar un mensaje automático en el chat usando las columnas correctas de tu tabla
+        mensaje_sistema = f"El administrador ha confirmado la fecha de entrega para: {nueva_fecha}"
+        cursor.execute("""
+            INSERT INTO pedido_mensajes (id_pedido, remitente_rol, remitente_nombre, mensaje, fecha) 
+            VALUES (%s, %s, %s, %s, NOW())
+        """, (id_pedido, 'administrador', 'Sistema', mensaje_sistema))
+        
+        conn.commit()
+        flash('Fecha de entrega confirmada exitosamente.', 'success')
+    except Exception as e:
+        conn.rollback()
+        print(f"Error al confirmar fecha: {e}")
+        flash('Ocurrió un error al confirmar la fecha.', 'danger')
+    finally:
+        cursor.close()
+        conn.close()
+        
+    return redirect(request.referrer)
+    
 ########################
 
 @app.route('/libro_reclamaciones', methods=['GET', 'POST'])
@@ -1562,7 +1574,7 @@ def ver_detalle_pedido_individual(id_pedido):
 
         # 2. Traer la bitácora de mensajes de este pedido específico (si existe la tabla)
         try:
-            cursor.execute("SELECT * FROM mensaje_pedido WHERE id_pedido = %s ORDER BY fecha ASC", (id_pedido,))
+            cursor.execute("SELECT * FROM pedido_mensajes WHERE id_pedido = %s ORDER BY fecha ASC", (id_pedido,))
             mensajes = cursor.fetchall()
         except:
             mensajes = [] # Por si tu tabla de mensajes se llama diferente
@@ -1577,7 +1589,7 @@ def ver_detalle_pedido_individual(id_pedido):
     # Preparar campos calculados
     pedido['cliente_completo'] = f"{pedido['cliente_nombre']} {pedido['cliente_apellidos'] or ''}".strip()
     pedido['costo_total'] = float(pedido['cantidad'] * pedido['precio_unitario'])
-    pedido['saldo'] = float(pedido['costo_total'] - (pedido['adelanto'] or 0.0))
+    pedido['saldo'] = float(pedido['costo_total']) - float(pedido['adelanto'] or 0.0)
 
     return render_template('admin/detalle_pedido.html', pedido=pedido, mensajes=mensajes)
 
@@ -2060,6 +2072,26 @@ def actualizar_envio(id_pedido):
 
     return redirect(request.referrer or url_for('pedidos'))    
 
+#######################
+def subir_a_supabase(archivo, carpeta=""):
+    """
+    Sube un archivo a Supabase Storage y retorna su URL pública absoluta.
+    """
+    if not archivo or archivo.filename == '':
+        return None
+    
+    if allowed_file(archivo.filename):
+        nombre_limpio = secure_filename(archivo.filename)
+        path_destino = f"{carpeta}/{int(time.time())}_{nombre_limpio}" if carpeta else f"{int(time.time())}_{nombre_limpio}"
+        
+        file_bytes = archivo.read()
+        supabase.storage.from_('uploads_pedidos').upload(
+            path=path_destino,
+            file=file_bytes,
+            file_options={"content-type": archivo.content_type}
+        )
+        return supabase.storage.from_('uploads_pedidos').get_public_url(path_destino)
+    return None
 
 ####################################
 # ========================================================
@@ -2105,6 +2137,85 @@ def ver_comprobante(id_pedido):
 
     # Necesitarás crear un archivo 'comprobante.html' en tu carpeta templates
     return render_template('comprobante.html', pedido=pedido, pagos=pagos)    
+###############
+
+# ========================================================
+# --- MÓDULO DE EMISIÓN DE FACTURAS Y BOLETAS ---
+# ========================================================
+@app.route('/pedido/<int:id_pedido>/factura')
+@login_required
+def ver_factura(id_pedido):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # 1. Consultar datos del pedido, cliente y producto
+        query = """
+            SELECT p.*, pr.nombre_producto, pr.precio AS precio_unitario,
+                   u.nombre AS cliente_nombre, u.apellidos AS cliente_apellidos, 
+                   u.documento AS cliente_documento, u.telefono AS cliente_telefono, 
+                   u.correo AS cliente_correo, u.direccion AS cliente_direccion,
+                   u.departamento AS cliente_dep, u.provincia AS cliente_prov, u.distrito AS cliente_dist,
+                   td.nombre AS tipo_doc_nombre
+            FROM pedido p
+            JOIN producto pr ON p.id_producto = pr.id
+            JOIN usuario u ON p.id_usuario = u.id
+            LEFT JOIN tipo_documento td ON u.id_tipo_documento = td.id
+            WHERE p.id = %s
+        """
+        cursor.execute(query, (id_pedido,))
+        pedido = cursor.fetchone()
+
+        if not pedido:
+            flash('El pedido solicitado no existe.', 'warning')
+            return redirect(url_for('pedidos'))
+
+        # Seguridad: El cliente solo puede acceder a comprobantes de sus propios pedidos
+        if session.get('rol') == 'cliente' and pedido['id_usuario'] != session.get('usuario_id'):
+            flash('Acceso denegado a este comprobante.', 'danger')
+            return redirect(url_for('mis_pedidos'))
+
+        # 2. Determinar si se emite FACTURA (RUC) o BOLETA (DNI)
+        doc_cliente = (pedido['cliente_documento'] or '').strip()
+        tipo_doc_str = (pedido['tipo_doc_nombre'] or '').lower()
+        
+        is_factura = 'ruc' in tipo_doc_str or len(doc_cliente) == 11
+        tipo_comprobante = "FACTURA ELECTRÓNICA" if is_factura else "BOLETA DE VENTA ELECTRÓNICA"
+        serie_correlativo = f"F001-{pedido['id']:06d}" if is_factura else f"B001-{pedido['id']:06d}"
+
+        # 3. Cálculo del Desglose Fiscal (IGV 18%)
+        total_general = float(pedido['cantidad'] * pedido['precio_unitario'])
+        subtotal = round(total_general / 1.18, 2)
+        igv = round(total_general - subtotal, 2)
+        adelanto = float(pedido['adelanto'] or 0.0)
+        saldo = max(0.0, round(total_general - adelanto, 2))
+
+        cliente_completo = f"{pedido['cliente_nombre']} {pedido['cliente_apellidos'] or ''}".strip()
+        direccion_completa = f"{pedido['cliente_direccion'] or ''} {pedido['cliente_dist'] or ''} {pedido['cliente_prov'] or ''}".strip() or "Lima, Perú"
+
+        factura_data = {
+            'tipo_comprobante': tipo_comprobante,
+            'serie_correlativo': serie_correlativo,
+            'subtotal': subtotal,
+            'igv': igv,
+            'total': total_general,
+            'adelanto': adelanto,
+            'saldo': saldo,
+            'cliente_completo': cliente_completo,
+            'direccion_completa': direccion_completa,
+            'is_factura': is_factura
+        }
+
+    except Exception as e:
+        print(f"Error al generar comprobante: {e}")
+        flash("Error al procesar el comprobante.", "danger")
+        return redirect(request.referrer or url_for('pedidos'))
+    finally:
+        cursor.close()
+        conn.close()
+
+    return render_template('factura.html', pedido=pedido, factura=factura_data)
+
 
 #######################################
 # ========================================================

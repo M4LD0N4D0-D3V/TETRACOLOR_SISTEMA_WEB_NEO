@@ -22,10 +22,14 @@
             
             <!-- COLUMNA IZQUIERDA: IMAGEN + DESCRIPCIÓN + PROMOCIÓN -->
             <div class="col-lg-5 col-md-6 bg-light d-flex flex-column border-end">
-                <!-- Imagen con altura máxima restringida para ahorrar espacio vertical -->
-                <img src="{{ producto.imagen if producto.imagen else 'https://via.placeholder.com/600x500?text=Sin+Imagen' }}" 
-                     class="img-fluid w-100" style="object-fit: cover; max-height: 280px;" alt="{{ producto.nombre_producto }}">
-                
+                <!-- Imagen con URL directa de Supabase o fallback predeterminado -->
+                <!-- Imagen ajustada exactamente al recuadro (object-fit: contain) -->
+                <div class="text-center bg-light rounded-top-4 p-2 d-flex align-items-center justify-content-center" style="min-height: 280px; max-height: 320px;">
+                    <img src="{{ producto.imagen or '/static/assets/logo/mi_logo.png' }}" 
+                        class="img-fluid" 
+                        style="object-fit: contain; max-height: 300px; width: 100%;" 
+                        alt="{{ producto.nombre_producto }}">
+                </div>
                 <div class="p-3 bg-white">
                     <h6 class="fw-bold" style="font-size: 0.9rem;">Descripción del Servicio:</h6>
                     <p class="text-muted mb-0" style="font-size: 0.8rem; line-height: 1.4;">
@@ -33,7 +37,7 @@
                     </p>
                 </div>
 
-                <!-- NUEVO: CAJA DE PROMOCIÓN DE DESCUENTOS -->
+                <!-- CAJA DE PROMOCIÓN DE DESCUENTOS -->
                 <div class="p-3 bg-warning-subtle border-top border-warning mt-auto">
                     <h6 class="fw-bold text-dark mb-1" style="font-size: 0.85rem;">
                         <i class="bi bi-tags-fill text-warning"></i> Promoción por Cantidad
@@ -56,12 +60,11 @@
                 <form action="/crear_pedido_cliente" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="id_producto" value="{{ producto.id }}">
 
-                    <!-- Opciones agrupadas en dos columnas para ahorrar espacio -->
+                    <!-- Opciones agrupadas en dos columnas -->
                     <div class="row g-2 mb-2" id="contenedor_materiales">
                         {% for tipo, opciones in opciones_agrupadas.items() %}
                         <div class="col-12 col-sm-6">
                             <label class="form-label fw-bold text-dark mb-1" style="font-size: 0.8rem;">{{ tipo }}:</label>
-                            <!-- Se usa form-select-sm para reducir altura -->
                             <select name="variacion_{{ tipo|replace(' ', '_')|lower }}" class="form-select form-select-sm border-dark variacion-select" required>
                                 <option value="" data-costo="0" disabled selected>-- Selecciona --</option>
                                 {% for op in opciones %}
@@ -76,7 +79,7 @@
                         {% endfor %}
                     </div>
 
-                    <!-- Diseño y Notas en una misma fila -->
+                    <!-- Diseño y Notas -->
                     <div class="row g-2 mb-3">
                         <div class="col-12 col-sm-6">
                             <label for="imagen_diseno" class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Diseño (Opcional):</label>
@@ -97,18 +100,19 @@
                             <input type="number" name="cantidad" id="input_cantidad" class="form-control form-control-sm text-center fw-bold border-dark" value="1" min="1" required>
                         </div>
                         <div class="col text-end">
-                            <!-- Aquí se mostrará el tachado y el aviso de ahorro si aplica -->
                             <div id="info_descuento" class="text-danger fw-bold d-none" style="font-size: 0.75rem; line-height: 1;"></div>
                             <h5 class="fw-bold text-success mb-0 mt-1" id="total_mostrar">Total: S/ 0.00</h5>
                         </div>
                     </div>
-                    <!-- Nueva Fila: Sugerencia de Fecha -->
+
+                    <!-- Sugerencia de Fecha -->
                     <div class="row g-2 mb-3">
                         <div class="col-12">
                             <label for="fecha_sugerida" class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Fecha sugerida para entrega (Sujeta a confirmación):</label>
                             <input type="date" class="form-control form-control-sm border-dark" id="fecha_sugerida" name="fecha_sugerida" required>
                         </div>
                     </div>
+
                     <div>
                         {% if 'usuario_id' in session %}
                             <button type="submit" class="btn btn-success btn-sm w-100 py-2 fw-bold fs-6 shadow-sm">
@@ -124,7 +128,6 @@
     </div>
 </div>
 
-<!-- LÓGICA DE CÁLCULO DE DESCUENTOS Y EXTRAS -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const inputCantidad = document.getElementById("input_cantidad");
@@ -132,14 +135,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const infoDescuento = document.getElementById("info_descuento");
     const selectsVariaciones = document.querySelectorAll('.variacion-select');
 
-    // Tomamos el precio base unitario de la base de datos
     const precioBase = parseFloat("{{ producto.precio }}");
 
     function recalcularPrecios() {
         let cantidad = parseInt(inputCantidad.value) || 1;
         let costoExtras = 0;
 
-        // Sumar todos los adicionales seleccionados (+5, +3.50, etc.)
         selectsVariaciones.forEach(select => {
             if (select.selectedIndex > 0) {
                 let opcionSeleccionada = select.options[select.selectedIndex];
@@ -147,26 +148,21 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
 
-        // Subtotal antes de descuentos (Precio Base + Materiales Extra) * Cantidad
         let precioUnitarioReal = precioBase + costoExtras;
         let subtotal = precioUnitarioReal * cantidad;
-        
         let descuentoPorcentaje = 0;
 
-        // Lógica de Tramos de Descuento
         if (cantidad >= 12) {
-            descuentoPorcentaje = 0.20; // 20% por docena o más
+            descuentoPorcentaje = 0.20;
         } else if (cantidad >= 6) {
-            descuentoPorcentaje = 0.10; // 10% de 6 a 11
+            descuentoPorcentaje = 0.10;
         }
 
         let montoDescuento = subtotal * descuentoPorcentaje;
         let totalFinal = subtotal - montoDescuento;
 
-        // Actualizar la Interfaz Gráfica
         if (descuentoPorcentaje > 0) {
             infoDescuento.classList.remove('d-none');
-            // Muestra el porcentaje y subtotal original tachado
             infoDescuento.innerHTML = `
                 <span class="text-muted text-decoration-line-through">S/ ${subtotal.toFixed(2)}</span> 
                 (-${descuentoPorcentaje * 100}%)
@@ -180,11 +176,8 @@ document.addEventListener("DOMContentLoaded", function() {
         totalMostrar.innerHTML = `Total: S/ ${totalFinal.toFixed(2)}`;
     }
 
-    // Ejecutar al cambiar cualquier valor
     inputCantidad.addEventListener("input", recalcularPrecios);
     selectsVariaciones.forEach(select => select.addEventListener("change", recalcularPrecios));
-    
-    // Ejecutar al cargar la página
     recalcularPrecios();
 });
 </script>

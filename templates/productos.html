@@ -7,6 +7,7 @@
             <i class="bi bi-plus-circle"></i> Nuevo Producto
         </button>
     </div>
+
 <form method="GET" action="{{ url_for(request.endpoint) }}" class="mb-4">
     <div class="input-group">
         <input type="text" name="q" class="form-control" placeholder="Buscar por nombre, documento..." value="{{ request.args.get('q', '') }}">
@@ -18,6 +19,7 @@
         {% endif %}
     </div>
 </form>
+
     <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
         <div class="card-body p-0">
             
@@ -44,7 +46,6 @@
                                     <strong>{{ prod.nombre_producto }}</strong>
                                 {% endif %}
                             </td>
-                            <!-- NUEVA COLUMNA DE CATEGORÍA -->
                             <td>
                                 <span class="badge bg-secondary-subtle text-secondary border">
                                     {{ prod.categoria_nombre if prod.categoria_nombre else 'Sin Categoría' }}
@@ -91,7 +92,6 @@
                                                 <h5 class="modal-title fs-6"><i class="bi bi-pencil-square"></i> Modificar Producto</h5>
                                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                             </div>
-                                            <!-- IMPORTANTE: enctype agregado para procesar imágenes -->
                                             <form action="/productos/editar/{{ prod.id }}" method="POST" enctype="multipart/form-data">
                                                 <div class="modal-body bg-light">
                                                     <div class="mb-3">
@@ -120,7 +120,7 @@
                                                     <div class="mb-3">
                                                         <label class="form-label text-muted small fw-bold">Actualizar Imagen (Opcional)</label>
                                                         <input type="file" name="imagen" class="form-control" accept="image/*">
-                                                        <small class="text-muted d-block mt-1">Deja en blanco para mantener la imagen actual.</small>
+                                                        <small class="text-muted d-block mt-1">Deja en blanco para mantener la imagen actual de Supabase.</small>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer bg-light border-0 rounded-bottom-4">
@@ -136,7 +136,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
+                            <td colspan="6" class="text-center py-5 text-muted">
                                 <i class="bi bi-box fs-1 d-block mb-3"></i> No hay productos registrados aún.
                             </td>
                         </tr>
@@ -156,7 +156,6 @@
                 <h5 class="modal-title fs-6"><i class="bi bi-plus-circle"></i> Registrar Nuevo Producto</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <!-- IMPORTANTE: enctype agregado -->
             <form action="/productos/guardar" method="POST" enctype="multipart/form-data">
                 <div class="modal-body bg-light">
                     <div class="mb-3">

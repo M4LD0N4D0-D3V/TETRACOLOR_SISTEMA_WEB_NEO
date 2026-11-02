@@ -18,10 +18,16 @@
                 {{ pedido.estado }}
             </span>
             
-            <!-- BOTÓN PARA GENERAR COMPROBANTE (NUEVO) -->
-            <a href="/pedido/{{ pedido.id }}/comprobante" class="btn btn-outline-info fw-bold shadow-sm" target="_blank" title="Imprimir Comprobante">
-                <i class="bi bi-printer"></i> Imprimir
-            </a>
+            <div class="d-flex gap-2">
+                <!-- Ticket Interno de Caja -->
+                <a href="/pedido/{{ pedido.id }}/comprobante" class="btn btn-outline-secondary fw-bold shadow-sm" target="_blank" title="Ticket interno de caja">
+                    <i class="bi bi-receipt"></i> Ticket
+                </a>
+                <!-- Factura / Boleta Oficial -->
+                <a href="/pedido/{{ pedido.id }}/factura" class="btn btn-outline-success fw-bold shadow-sm" target="_blank" title="Emitir Factura o Boleta">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Factura / Boleta
+                </a>
+            </div>
             
             <!-- MENÚ DESPLEGABLE PARA CAMBIAR ESTADO -->
             <div class="dropdown">
@@ -57,7 +63,6 @@
                         <div class="col-md-6">
                             <span class="text-muted d-block small">Cliente:</span>
                             <span class="fw-bold fs-5">{{ pedido.cliente_completo }}</span>
-                            <!-- Enlace rápido al historial del cliente (Asegúrate de que la ruta exista o adáptala) -->
                             <a href="/clientes" class="btn btn-sm btn-link py-0 text-decoration-none" title="Ver clientes">
                                 <i class="bi bi-clock-history"></i> Ver en clientes
                             </a>
@@ -82,7 +87,7 @@
                         </div>
                     </div>
 
-                    <!-- NUEVO BLOQUE PARA LA FECHA SUGERIDA -->
+                    <!-- BLOQUE DE FECHA SUGERIDA -->
                     <div class="row mb-4">
                         <div class="col-md-12 bg-light p-2 rounded">
                             <span class="text-muted d-inline-block small me-2"><i class="bi bi-calendar-event"></i> Fecha Sugerida por el Cliente:</span>
@@ -102,8 +107,8 @@
                     <span class="text-muted d-block small mb-1">Archivo de Diseño:</span>
                     {% if pedido.archivo_diseno %}
                         <div class="p-3 border rounded-3 text-center bg-light">
-                            <a href="{{ url_for('static', filename='uploads/disenos/' ~ pedido.archivo_diseno) }}" target="_blank">
-                                <img src="{{ url_for('static', filename='uploads/disenos/' ~ pedido.archivo_diseno) }}" class="img-fluid rounded border shadow-sm" style="max-height: 200px;" alt="Diseño Adjunto" onerror="this.onerror=null; this.outerHTML='<button class=\'btn btn-outline-primary\'><i class=\'bi bi-file-earmark-arrow-down\'></i> Abrir/Descargar Archivo Adjunto</button>';">
+                            <a href="{{ pedido.archivo_diseno }}" target="_blank" class="d-inline-block">
+                                <img src="{{ pedido.archivo_diseno }}" class="img-fluid rounded border shadow-sm" style="max-height: 200px;" alt="Diseño Adjunto" onerror="this.onerror=null; this.outerHTML='<a href=\'{{ pedido.archivo_diseno }}\' target=\'_blank\' class=\'btn btn-outline-primary\'><i class=\'bi bi-file-earmark-arrow-down\'></i> Abrir / Descargar Archivo Adjunto</a>';">
                             </a>
                         </div>
                     {% else %}
@@ -129,13 +134,13 @@
                                 {% if msg.mensaje %}<span class="d-block mb-1">{{ msg.mensaje }}</span>{% endif %}
                                 {% if msg.archivo_adjunto %}
                                     <div class="mt-2 mb-1">
-                                        <a href="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" target="_blank">
-                                            <img src="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" alt="Adjunto" style="max-width: 150px; max-height: 150px; object-fit: cover;" class="rounded border">
+                                        <a href="{{ msg.archivo_adjunto }}" target="_blank">
+                                            <img src="{{ msg.archivo_adjunto }}" alt="Adjunto" style="max-width: 150px; max-height: 150px; object-fit: cover;" class="rounded border">
                                         </a>
                                     </div>
                                 {% endif %}
                                 <small class="d-block {% if msg.remitente_rol == 'administrador' %}text-white-50{% else %}text-muted{% endif %}" style="font-size: 0.65rem;">
-                                    {{ msg.fecha.strftime('%d/%m/%Y %H:%M') if msg.fecha else '' }}
+                                    {{ msg.fecha | lima_time if msg.fecha else '' }}
                                 </small>
                             </div>
                         {% else %}
@@ -155,6 +160,22 @@
                         </div>
                         <div id="previewAdjunto{{ pedido.id }}" class="text-success small fw-bold mt-1"></div>
                     </form>
+
+                    <!-- Formulario para Confirmar Fecha de Entrega -->
+                    <div class="mt-3 p-3 border rounded bg-light shadow-sm">
+                        <label class="form-label fw-bold text-dark mb-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-calendar-check text-success"></i> Confirmar Fecha de Entrega
+                        </label>
+                        <form action="/pedido/{{ pedido.id }}/confirmar_fecha" method="POST" class="d-flex gap-2">
+                            <input type="date" name="fecha_confirmada" class="form-control form-control-sm" required>
+                            <button type="submit" class="btn btn-success btn-sm text-nowrap">
+                                <i class="bi bi-check-circle"></i> Confirmar y Notificar
+                            </button>
+                        </form>
+                        <small class="text-muted mt-1 d-block" style="font-size: 0.75rem;">
+                            Al confirmar, se actualizará la fecha del pedido y se enviará un mensaje automático al cliente en el chat.
+                        </small>
+                    </div>
                 </div>
             </div>
 
