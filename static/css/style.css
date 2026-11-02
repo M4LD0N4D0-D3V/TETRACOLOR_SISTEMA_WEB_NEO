@@ -116,3 +116,56 @@
     margin-left: auto;
     margin-right: auto;
 }
+
+/* =========================================
+   ESTILOS PERSONALIZADOS - BADGES Y PAGINACIÓN
+   ========================================= */
+
+/* Badges de Estado en tonos Mate/Neutros */
+.badge-mate-pendiente {
+    background-color: #d4a320 !important; /* Mostaza oscuro mate */
+    color: #fff !important;
+}
+
+.badge-mate-proceso {
+    background-color: #4a5c6a !important; /* Azul plomizo / Gris mate */
+    color: #fff !important;
+}
+
+.badge-mate-completado {
+    background-color: var(--tetra-green) !important; /* Verde TetraColor */
+    color: #fff !important;
+}
+
+/* Botón Gestionar Neutro */
+.btn-mate-gestionar {
+    background-color: #3b3b3b !important;
+    color: #ffffff !important;
+    border: none;
+    transition: background-color 0.2s;
+}
+.btn-mate-gestionar:hover {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+}
+
+/* Paginación adaptada a TetraColor */
+.pagination {
+    margin-top: 2rem !important; /* Más separación de la tabla */
+}
+.pagination .page-link {
+    color: var(--tetra-dark);
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s;
+}
+.pagination .page-link:hover {
+    color: var(--tetra-green);
+    background-color: #f8f9fa;
+}
+.pagination .page-item.active .page-link {
+    background-color: var(--tetra-green);
+    border-color: var(--tetra-green);
+    color: white;
+    font-weight: bold;
+}

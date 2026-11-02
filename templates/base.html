@@ -38,7 +38,7 @@
         }
 
         .navbar-brand-img {
-            height: 65px;
+            height: 95px;
             width: auto;
             object-fit: contain;
         }
@@ -224,6 +224,18 @@
             .whatsapp-float { width: 50px; height: 50px; bottom: 20px; right: 20px; font-size: 25px; }
         }
     </style>
+    <style>
+        /* 1. Elimina el exceso de espacio blanco superior en todas las ventanas */
+        .container.py-5, .container.py-4 {
+            padding-top: 1.5rem !important;
+        }
+        
+        /* 2. Controla la proporción máxima de las imágenes a nivel global */
+        .img-fluid {
+            max-height: 550px; 
+            object-fit: cover;
+        }
+    </style>    
 </head>
 <body class="d-flex flex-column min-vh-100">
 
@@ -347,43 +359,63 @@
     </div>
     
     <!-- CONTENIDO PRINCIPAL -->
-    <div class="container mt-4 mb-5 flex-grow-1">
+    <div class="container mt-1 mb-5 flex-grow-1">
         {% block content %}{% endblock %}
     </div>
     
     <!-- FOOTER -->
-    <footer class="bg-tetra-dark text-white py-5 mt-auto border-top border-secondary">
+    <footer class="bg-tetra-dark text-white py-4 mt-auto border-top border-secondary">
         <div class="container">
             <div class="row align-items-center">
                 
+                <!-- Columna 1: Logo, Info y Libro de Reclamaciones -->
                 <div class="col-md-4 text-center text-md-start mb-4 mb-md-0">
-                    <img src="{{ url_for('static', filename='assets/logo/mi_logo.png') }}" alt="TetraColor" height="60" class="mb-2">
-                    <p class="text-light opacity-75 small mb-0 mt-2">TETRACOLOR PERÚ<br>Nuestros Productos, Resultados Notables.</p>
+                    <a href="/" class="text-decoration-none d-inline-block mb-2">
+                        <img src="{{ url_for('static', filename='assets/logo/mi_logo.png') }}" alt="TetraColor" height="75">
+                    </a>
+                    <div class="mb-2">
+                        <span class="fs-6 fw-bold" style="font-family: 'Montserrat', sans-serif;">
+                            <span class="text-white">TETRA</span><span class="text-tetra-green">COLOR</span> PERÚ
+                        </span>
+                        <p class="text-light opacity-75 small mb-0">Nuestros Productos, Resultados Notables.</p>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="/libro_reclamaciones" class="text-decoration-none text-light hover-scale d-inline-flex align-items-center gap-2 p-2 border border-secondary rounded shadow-sm" style="background-color: rgba(255,255,255,0.05);">
+                            <i class="bi bi-journal-text fs-4 text-warning"></i>
+                            <div class="d-flex flex-column text-start">
+                                <span class="fw-bold text-uppercase" style="font-size: 0.8rem; letter-spacing: 0.5px;">Libro de Reclamaciones</span>
+                                <span class="text-white-50" style="font-size: 0.7rem;">Conforme al D.S. N° 011-2011-PCM</span>
+                            </div>
+                        </a>
+                    </div>
                 </div>
-
+                
+                <!-- Columna 2: Redes Sociales -->
                 <div class="col-md-4 text-center mb-4 mb-md-0">
-                    <h6 class="text-uppercase fw-bold text-tetra-green mb-3">Síguenos</h6>
-                    <div class="d-flex justify-content-center gap-3">
-                        <a href="https://wa.me/51XXXXXXXXX" target="_blank" class="btn btn-outline-success border-0 rounded-circle p-2 hover-scale">
-                            <i class="bi bi-whatsapp fs-4"></i>
+                    <h6 class="text-uppercase fw-bold text-tetra-green mb-3" style="letter-spacing: 1px; font-size: 0.85rem;">Síguenos en Redes</h6>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="https://wa.me/51XXXXXXXXX" target="_blank" class="btn btn-outline-success bg-dark border-0 rounded-circle p-2 hover-scale shadow-sm">
+                            <i class="bi bi-whatsapp fs-5"></i>
                         </a>
-                        <a href="https://www.facebook.com/profile.php?id=100008839034128" target="_blank" class="btn btn-outline-primary border-0 rounded-circle p-2 hover-scale">
-                            <i class="bi bi-facebook fs-4"></i>
+                        <a href="https://www.facebook.com/profile.php?id=100008839034128" target="_blank" class="btn btn-outline-primary bg-dark border-0 rounded-circle p-2 hover-scale shadow-sm">
+                            <i class="bi bi-facebook fs-5"></i>
                         </a>
-                        <a href="https://instagram.com/tuperfil" target="_blank" class="btn btn-outline-light border-0 rounded-circle p-2 hover-scale" style="color: #E4405F !important;">
-                            <i class="bi bi-instagram fs-4"></i>
+                        <a href="https://instagram.com/tuperfil" target="_blank" class="btn btn-outline-light bg-dark border-0 rounded-circle p-2 hover-scale shadow-sm" style="color: #E4405F !important;">
+                            <i class="bi bi-instagram fs-5"></i>
                         </a>
-                        <a href="https://www.tiktok.com/@cristiansinchecam?_r=1&_t=ZS-9Ac3HLSoQcS" target="_blank" class="btn btn-outline-light border-0 rounded-circle p-2 hover-scale">
-                            <i class="bi bi-tiktok fs-4"></i>
+                        <a href="https://www.tiktok.com/@cristiansinchecam?_r=1&_t=ZS-9Ac3HLSoQcS" target="_blank" class="btn btn-outline-light bg-dark border-0 rounded-circle p-2 hover-scale shadow-sm">
+                            <i class="bi bi-tiktok fs-5"></i>
                         </a>
-                        <a href="https://youtube.com/c/tucanal" target="_blank" class="btn btn-outline-danger border-0 rounded-circle p-2 hover-scale">
-                            <i class="bi bi-youtube fs-4"></i>
+                        <a href="https://youtube.com/c/tucanal" target="_blank" class="btn btn-outline-danger bg-dark border-0 rounded-circle p-2 hover-scale shadow-sm">
+                            <i class="bi bi-youtube fs-5"></i>
                         </a>
                     </div>
                 </div>
 
+                <!-- Columna 3: Copyright -->
                 <div class="col-md-4 text-center text-md-end">
-                    <p class="text-light opacity-75 small mb-0">&copy; 2026 TetraColor Perú.<br>Todos los derechos reservados.</p>
+                    <p class="text-light opacity-50 small mb-0">&copy; 2026 TetraColor Perú.<br>Todos los derechos reservados.</p>
                 </div>
                 
             </div>

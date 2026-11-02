@@ -1,0 +1,44 @@
+{% if paginacion.pages > 1 %}
+<nav aria-label="Navegación de páginas">
+    <ul class="pagination justify-content-center">
+        <!-- Convertimos los parámetros de la URL actual en un diccionario -->
+        {% set args = request.args.to_dict() %}
+
+        <!-- Botón Anterior -->
+        {% if paginacion.has_prev %}
+            {% set _ = args.update({'page': paginacion.prev_num}) %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for(request.endpoint, **args) }}">Anterior</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+        {% endif %}
+
+        <!-- Números de Página -->
+        {% for page_num in paginacion.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if page_num %}
+                {% if page_num == paginacion.page %}
+                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                {% else %}
+                    {% set _ = args.update({'page': page_num}) %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for(request.endpoint, **args) }}">{{ page_num }}</a>
+                    </li>
+                {% endif %}
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Botón Siguiente -->
+        {% if paginacion.has_next %}
+            {% set _ = args.update({'page': paginacion.next_num}) %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for(request.endpoint, **args) }}">Siguiente</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}

@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+    <!-- BOTÓN VOLVER Y ENCABEZADO -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm mb-2 shadow-sm">
+                <i class="bi bi-arrow-left"></i> Volver al listado
+            </a>
+            <h2 class="fw-bold m-0"><i class="bi bi-info-circle-fill text-primary"></i> Detalle del Pedido #{{ pedido.id }}</h2>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge fs-6 
+                {% if pedido.estado == 'Pendiente' %}bg-warning text-dark
+                {% elif pedido.estado == 'En Proceso' %}bg-primary
+                {% elif pedido.estado == 'Completado' %}bg-success
+                {% else %}bg-danger{% endif %} shadow-sm py-2 px-3">
+                {{ pedido.estado }}
+            </span>
+            
+            <!-- BOTÓN PARA GENERAR COMPROBANTE (NUEVO) -->
+            <a href="/pedido/{{ pedido.id }}/comprobante" class="btn btn-outline-info fw-bold shadow-sm" target="_blank" title="Imprimir Comprobante">
+                <i class="bi bi-printer"></i> Imprimir
+            </a>
+            
+            <!-- MENÚ DESPLEGABLE PARA CAMBIAR ESTADO -->
+            <div class="dropdown">
+                <button class="btn btn-outline-dark fw-bold shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Cambiar Estado
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow">
+                    <li><a class="dropdown-item" href="/pedidos/estado/{{ pedido.id }}/Pendiente"><i class="bi bi-box text-warning"></i> Pendiente</a></li>
+                    <li><a class="dropdown-item" href="/pedidos/estado/{{ pedido.id }}/En Proceso"><i class="bi bi-gear-fill text-primary"></i> En Proceso</a></li>
+                    <li><a class="dropdown-item" href="/pedidos/estado/{{ pedido.id }}/Completado"><i class="bi bi-check-circle text-success"></i> Completado</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-danger fw-bold" href="/pedidos/anular/{{ pedido.id }}" onclick="return confirm('¿Estás seguro de que deseas ANULAR este pedido?')">
+                            <i class="bi bi-x-circle"></i> Anular Pedido
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- COLUMNA IZQUIERDA: ESPECIFICACIONES Y BITÁCORA -->
+        <div class="col-lg-8">
+            
+            <!-- 1. ESPECIFICACIONES -->
+            <div class="card shadow-sm border-0 rounded-4 mb-4">
+                <div class="card-header bg-dark text-white rounded-top-4">
+                    <h5 class="mb-0"><i class="bi bi-card-text"></i> Especificaciones del Trabajo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small">Cliente:</span>
+                            <span class="fw-bold fs-5">{{ pedido.cliente_completo }}</span>
+                            <!-- Enlace rápido al historial del cliente (Asegúrate de que la ruta exista o adáptala) -->
+                            <a href="/clientes" class="btn btn-sm btn-link py-0 text-decoration-none" title="Ver clientes">
+                                <i class="bi bi-clock-history"></i> Ver en clientes
+                            </a>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small">Teléfono / Contacto:</span>
+                            <span class="fw-bold">{{ pedido.cliente_telefono or 'No registrado' }}</span>
+                            {% if pedido.cliente_telefono %}
+                            <a href="https://wa.me/51{{ pedido.cliente_telefono }}" target="_blank" class="btn btn-sm btn-success ms-2 py-0"><i class="bi bi-whatsapp"></i></a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small">Producto Solicitado:</span>
+                            <span class="fw-bold text-primary">{{ pedido.nombre_producto }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="text-muted d-block small">Cantidad:</span>
+                            <span class="fw-bold">{{ pedido.cantidad }} unidades</span>
+                        </div>
+                    </div>
+
+                    <!-- NUEVO BLOQUE PARA LA FECHA SUGERIDA -->
+                    <div class="row mb-4">
+                        <div class="col-md-12 bg-light p-2 rounded">
+                            <span class="text-muted d-inline-block small me-2"><i class="bi bi-calendar-event"></i> Fecha Sugerida por el Cliente:</span>
+                            <span class="fw-bold text-dark">
+                                {% if pedido.fecha_sugerida %}
+                                    {{ pedido.fecha_sugerida }} (Sujeta a confirmación por chat)
+                                {% else %}
+                                    No especificó
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <span class="text-muted d-block small mb-1">Notas y Especificaciones:</span>
+                    <div class="p-3 bg-light border rounded-3 mb-4 text-dark" style="white-space: pre-wrap; font-size: 0.95rem;">{{ pedido.especificaciones }}</div>
+
+                    <span class="text-muted d-block small mb-1">Archivo de Diseño:</span>
+                    {% if pedido.archivo_diseno %}
+                        <div class="p-3 border rounded-3 text-center bg-light">
+                            <a href="{{ url_for('static', filename='uploads/disenos/' ~ pedido.archivo_diseno) }}" target="_blank">
+                                <img src="{{ url_for('static', filename='uploads/disenos/' ~ pedido.archivo_diseno) }}" class="img-fluid rounded border shadow-sm" style="max-height: 200px;" alt="Diseño Adjunto" onerror="this.onerror=null; this.outerHTML='<button class=\'btn btn-outline-primary\'><i class=\'bi bi-file-earmark-arrow-down\'></i> Abrir/Descargar Archivo Adjunto</button>';">
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-secondary py-2 text-center mb-0">
+                            <i class="bi bi-dash-circle"></i> El cliente no adjuntó archivos.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 2. BITÁCORA DE MENSAJERÍA -->
+            <div class="card shadow-sm border-0 rounded-4 mb-4">
+                <div class="card-header bg-dark text-white rounded-top-4">
+                    <h5 class="mb-0"><i class="bi bi-journal-text text-success"></i> Bitácora de Mensajería</h5>
+                </div>
+                <div class="card-body bg-light text-start">
+                    <div class="border rounded-3 p-3 bg-white mb-3 shadow-sm" style="height: 350px; overflow-y: auto;">
+                        {% for msg in mensajes %}
+                            <div class="mb-2 p-2 rounded-3 {% if msg.remitente_rol == 'administrador' %}bg-primary text-white text-end ms-5 shadow-sm{% else %}bg-light text-start me-5 shadow-sm border{% endif %}" style="font-size: 0.9rem;">
+                                <strong class="d-block" style="font-size: 0.75rem;">
+                                    {% if msg.remitente_rol == 'administrador' %}🛠️ Tú{% else %}👤 Cliente{% endif %}
+                                </strong>
+                                {% if msg.mensaje %}<span class="d-block mb-1">{{ msg.mensaje }}</span>{% endif %}
+                                {% if msg.archivo_adjunto %}
+                                    <div class="mt-2 mb-1">
+                                        <a href="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" target="_blank">
+                                            <img src="{{ url_for('static', filename='uploads/mensajes/' ~ msg.archivo_adjunto) }}" alt="Adjunto" style="max-width: 150px; max-height: 150px; object-fit: cover;" class="rounded border">
+                                        </a>
+                                    </div>
+                                {% endif %}
+                                <small class="d-block {% if msg.remitente_rol == 'administrador' %}text-white-50{% else %}text-muted{% endif %}" style="font-size: 0.65rem;">
+                                    {{ msg.fecha.strftime('%d/%m/%Y %H:%M') if msg.fecha else '' }}
+                                </small>
+                            </div>
+                        {% else %}
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-chat-quote fs-2 d-block mb-2"></i> Sin observaciones ni mensajes registrados.
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <form action="/pedido/{{ pedido.id }}/enviar_mensaje" method="POST" enctype="multipart/form-data">
+                        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>{% endif %}
+                        <div class="input-group">
+                            <input type="text" name="mensaje" class="form-control" placeholder="Escribir mensaje al cliente...">
+                            <input type="file" name="adjunto" id="adjuntoAdmin{{ pedido.id }}" class="d-none" accept="image/*,.pdf" onchange="mostrarPreviewAdjunto(this, 'previewAdjunto{{ pedido.id }}')">
+                            <label for="adjuntoAdmin{{ pedido.id }}" class="btn btn-outline-secondary bg-white text-dark" title="Adjuntar comprobante o imagen"><i class="bi bi-paperclip"></i></label>
+                            <button class="btn btn-dark" type="submit"><i class="bi bi-send-fill"></i></button>
+                        </div>
+                        <div id="previewAdjunto{{ pedido.id }}" class="text-success small fw-bold mt-1"></div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COLUMNA DERECHA: FINANZAS Y PAGOS -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 rounded-4 mb-4 position-sticky" style="top: 20px;">
+                <div class="card-header bg-success text-white rounded-top-4">
+                    <h5 class="mb-0"><i class="bi bi-wallet2"></i> Resumen de Pago</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                        <span class="text-muted">Total General:</span>
+                        <span class="fw-bold fs-6">S/ {{ "%.2f"|format(pedido.costo_total) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                        <span class="text-muted">Pagado a la fecha:</span>
+                        <span class="fw-bold text-success fs-6">S/ {{ "%.2f"|format(pedido.adelanto or 0.0) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <span class="text-muted fw-bold">Saldo Pendiente:</span>
+                        <span class="fw-bold fs-5 {% if pedido.saldo > 0 %}text-danger{% else %}text-success{% endif %}">
+                            S/ {{ "%.2f"|format(pedido.saldo if pedido.saldo > 0 else 0.0) }}
+                        </span>
+                    </div>
+
+                    {% if pedido.saldo > 0.01 %}
+                    <form action="/pedido/actualizar_pago/{{ pedido.id }}" method="POST" class="bg-light p-3 rounded-3 border">
+                        <h6 class="fw-bold mb-3 text-center text-dark">Registrar Nuevo Abono</h6>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted mb-1">Método</label>
+                            <select name="metodo_pago" class="form-select form-select-sm">
+                                <option value="Yape">Yape</option>
+                                <option value="Plin">Plin</option>
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Transferencia">Transferencia</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Monto (S/)</label>
+                            <input type="number" step="0.01" max="{{ pedido.saldo }}" name="monto_pago" class="form-control form-control-sm text-end fw-bold text-success border-success" value="{{ "%.2f"|format(pedido.saldo) }}" required>
+                        </div>
+                        <button type="submit" class="btn btn-success btn-sm w-100 fw-bold shadow-sm">
+                            <i class="bi bi-cash"></i> Cargar Pago
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-success text-center py-2 mb-0 fw-bold shadow-sm">
+                        <i class="bi bi-check-circle-fill"></i> ¡Pedido pagado al 100%!
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function mostrarPreviewAdjunto(input, previewId) {
+        const contenedor = document.getElementById(previewId);
+        if (input.files && input.files[0]) {
+            contenedor.innerHTML = '<i class="bi bi-file-earmark-image"></i> Archivo listo: ' + input.files[0].name;
+        } else {
+            contenedor.innerHTML = '';
+        }
+    }
+</script>
+{% endblock %}

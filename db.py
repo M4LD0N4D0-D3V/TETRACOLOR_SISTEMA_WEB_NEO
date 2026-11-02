@@ -133,7 +133,8 @@ class Pedido(db.Model):
     id_producto = db.Column(db.Integer, db.ForeignKey('producto.id'))
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
     especificaciones = db.Column(db.Text)
-    estado = db.Column(db.String(20), default='Pendiente')
+    estado = db.Column(db.String(20), default='Pendiente')    
+    fecha_sugerida = db.Column(db.String(20))
     cantidad = db.Column(db.Integer, default=1)
     archivo_diseno = db.Column(db.String(255))
     adelanto = db.Column(db.Numeric(10, 2), default=0.00)
@@ -238,6 +239,19 @@ class MovimientoInventario(db.Model):
     id_proveedor = db.Column(db.Integer, db.ForeignKey('proveedor.id'))
     id_usuario_sistema = db.Column(db.Integer, db.ForeignKey('usuarios_sistema.id'))
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Reclamo(db.Model):
+    __tablename__ = 'reclamo'
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    tipo_documento = db.Column(db.String(20))
+    documento = db.Column(db.String(20), nullable=False)
+    nombres = db.Column(db.String(150), nullable=False)
+    correo = db.Column(db.String(100), nullable=False)
+    telefono = db.Column(db.String(20))
+    tipo = db.Column(db.String(20)) # 'Reclamo' o 'Queja'
+    descripcion = db.Column(db.Text, nullable=False)
+    estado = db.Column(db.String(20), default='Pendiente') # Pendiente, Atendido
 
 def get_connection():
     uri = os.getenv("DATABASE_URL")

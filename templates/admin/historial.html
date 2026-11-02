@@ -3,14 +3,16 @@
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Historial de: <span class="text-primary">{{ cliente }}</span></h2>
-        <a href="/pedidos" class="btn btn-outline-secondary">Regresar al Panel</a>
+        <a href="{{ url_for('clientes') }}" class="btn btn-outline-secondary">Regresar a Clientes</a>
     </div>
 
     <div class="card shadow-sm border-0 rounded-3">
         <div class="card-body p-0">
-            <table class="table table-striped mb-0">
+            <!-- Agregamos table-hover para el efecto visual -->
+            <table class="table table-striped table-hover mb-0">
                 <thead class="bg-light">
                     <tr>
+                        <th>ID</th> <!-- Columna ID agregada -->
                         <th>Fecha</th>
                         <th>Producto</th>
                         <th>Cant.</th>
@@ -20,7 +22,9 @@
                 </thead>
                 <tbody>
                     {% for p in pedidos %}
-                    <tr>
+                    <!-- Fila Clickeable -->
+                    <tr style="cursor: pointer;" onclick="window.location.href='/admin/pedido/{{ p.id }}'" title="Ver detalles del pedido">
+                        <td class="fw-bold text-muted">#{{ p.id }}</td>
                         <td>{{ p.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td class="fw-bold">{{ p.nombre_producto }}</td>
                         <td>{{ p.cantidad }}</td>
@@ -29,6 +33,12 @@
                             <span class="badge {% if p.estado == 'Anulado' %}bg-danger{% else %}bg-dark{% endif %}">
                                 {{ p.estado }}
                             </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            Este cliente aún no tiene pedidos registrados.
                         </td>
                     </tr>
                     {% endfor %}

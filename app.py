@@ -7,6 +7,8 @@ import mercadopago
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+import pandas as pd
+import openpyxl
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -14,14 +16,15 @@ load_dotenv()
 mp_access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 sdk = mercadopago.SDK(mp_access_token)
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_bcrypt import Bcrypt
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, text
-from db import db, Usuario, Producto, Pedido, TipoDocumento, get_connection, MetodoPago, HistorialPagos 
+from db import db, Usuario, Producto, Pedido, TipoDocumento, get_connection, MetodoPago, HistorialPagos, Reclamo 
 from db import CategoriaProducto, VariacionMaterial
 from werkzeug.exceptions import RequestEntityTooLarge
 from zoneinfo import ZoneInfo
+from io import BytesIO
 
 
 app = Flask(__name__)
@@ -44,8 +47,50 @@ def lima_time_filter(dt):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo("UTC"))
     dt_lima = dt.astimezone(LIMA_TZ)
-    return dt_lima.strftime('%Y-%m-%d %H:%M:%S')
+    return dt_lima.strftime('%d/%m/%Y %H:%M')
 
+
+# ==========================================
+# CLASES Y FUNCIONES AUXILIARES PARA PAGINACIÓN
+# ==========================================
+class PaginacionDict:
+    """Simula el objeto de paginación de SQLAlchemy para consultas raw psycopg2."""
+    def __init__(self, total, page, per_page):
+        self.total = total
+        self.page = page
+        self.per_page = per_page
+        self.pages = (total + per_page - 1) // per_page if per_page > 0 else 1
+        self.has_prev = page > 1
+        self.has_next = page < self.pages
+        self.prev_num = page - 1
+        self.next_num = page + 1
+        self.first = ((page - 1) * per_page) + 1 if total > 0 else 0
+        self.last = min(page * per_page, total)
+
+    def iter_pages(self, left_edge=1, right_edge=1, left_current=2, right_current=2):
+        last = 0
+        for num in range(1, self.pages + 1):
+            if num <= left_edge or \
+               (num >= self.page - left_current and num <= self.page + right_current) or \
+               num > self.pages - right_edge:
+                if last + 1 != num:
+                    yield None
+                yield num
+                last = num
+
+def obtener_parametros_paginacion():
+    try:
+        page = int(request.args.get('page', 1))
+        if page < 1: page = 1
+    except ValueError:
+        page = 1
+    try:
+        per_page = int(request.args.get('per_page', 10))
+        if per_page not in [10, 25, 50, 100]:
+            per_page = 10
+    except ValueError:
+        per_page = 10
+    return page, per_page
 
 # ==========================================
 # CONFIGURACIÓN DE BASE DE DATOS (.ENV)
@@ -316,7 +361,7 @@ def crear_pedido_cliente():
     
     material = request.form.get("material", "N/A").strip()
     notas = request.form.get("notas", "").strip()
-    
+    fecha_sugerida = request.form.get("fecha_sugerida")
     monto_pago_raw = request.form.get("monto_pago") or request.form.get("monto_adelanto")
     metodo_pago_nombre = request.form.get("metodo_pago", "Transferencia").strip()
     referencia_voucher = request.form.get("referencia_voucher", "").strip()
@@ -347,7 +392,8 @@ def crear_pedido_cliente():
             cantidad=cantidad,
             especificaciones=especificaciones,
             archivo_diseno=nombre_archivo,
-            estado='Pendiente'
+            estado='Pendiente',
+            fecha_sugerida=fecha_sugerida
         )
         db.session.add(nuevo_pedido)
         
@@ -662,61 +708,67 @@ def admin_login():
 
 
 # --- GESTIÓN DE PEDIDOS ---
-# --- ACTUALIZACIÓN DE LA RUTA DE ADMINISTRADOR ---
-# --- ACTUALIZACIÓN DE LA RUTA DE ADMINISTRADOR ---
-# --- ACTUALIZACIÓN DE LA RUTA DE ADMINISTRADOR ---
 @app.route('/pedidos') 
 @login_required
 @admin_required
 def pedidos():
+    page, per_page = obtener_parametros_paginacion()
+    offset = (page - 1) * per_page
+
     conn = get_connection() 
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
-    # 1. Traer Pedidos principales sumando dinámicamente lo pagado en historial_pagos
-    cursor.execute("""
-        SELECT p.id, p.id_usuario, us.nombres AS empleado, c.nombre AS cliente, 
-               c.telefono AS telefono, pr.nombre_producto AS producto, 
-               p.cantidad, p.especificaciones, pr.precio AS precio_unitario,
-               (p.cantidad * pr.precio) AS total_pagado, 
-               COALESCE(
-                   (SELECT SUM(monto) FROM historial_pagos hp WHERE hp.id_pedido = p.id), 
-                   p.adelanto, 
-                   0
-               ) AS adelanto,
-               p.archivo_diseno, p.estado, p.fecha 
-        FROM pedido p
-        LEFT JOIN usuarios_sistema us ON p.id_usuario_sistema = us.id
-        LEFT JOIN usuario c ON p.id_usuario = c.id
-        LEFT JOIN producto pr ON p.id_producto = pr.id
-        ORDER BY p.id DESC
-    """) 
-    pedidos_data = cursor.fetchall() 
-    
-    # 2. Traer todos los mensajes internos para la bitácora
-    cursor.execute("SELECT * FROM pedido_mensajes ORDER BY fecha ASC")
-    todos_los_mensajes = cursor.fetchall()
-    
-    mensajes_por_pedido = {}
-    for msg in todos_los_mensajes:
-        pid = msg['id_pedido']
-        if pid not in mensajes_por_pedido:
-            mensajes_por_pedido[pid] = []
-        mensajes_por_pedido[pid].append(msg)
+    try:
+        # Total de pedidos
+        cursor.execute("SELECT COUNT(*) AS total FROM pedido")
+        total = cursor.fetchone()['total']
+
+        # 1. Traer Pedidos principales sumando dinámicamente lo pagado en historial_pagos (PAGINADO)
+        cursor.execute("""
+            SELECT p.id, p.id_usuario, us.nombres AS empleado, CONCAT(c.nombre, ' ', COALESCE(c.apellidos, '')) AS cliente, 
+                   c.telefono AS telefono, pr.nombre_producto AS producto, 
+                   p.cantidad, p.especificaciones, pr.precio AS precio_unitario,
+                   (p.cantidad * pr.precio) AS total_pagado, 
+                   COALESCE(
+                       (SELECT SUM(monto) FROM historial_pagos hp WHERE hp.id_pedido = p.id), 
+                       p.adelanto, 
+                       0
+                   ) AS adelanto,
+                   p.archivo_diseno, p.estado, p.fecha 
+            FROM pedido p
+            LEFT JOIN usuarios_sistema us ON p.id_usuario_sistema = us.id
+            LEFT JOIN usuario c ON p.id_usuario = c.id
+            LEFT JOIN producto pr ON p.id_producto = pr.id
+            ORDER BY p.id DESC
+            LIMIT %s OFFSET %s
+        """, (per_page, offset)) 
+        pedidos_data = cursor.fetchall() 
         
-    # 3. Traer todo el historial agrupado para los modales
-    historial_por_cliente = {}
-    for ped in pedidos_data:
-        uid = ped['id_usuario']
-        if uid not in historial_por_cliente:
-            historial_por_cliente[uid] = []
-        historial_por_cliente[uid].append(ped)
-        
-    conn.close()    
+        # 2. Traer mensajes y el historial SOLO para los pedidos que se están mostrando en esta página
+        pedido_ids = [p['id'] for p in pedidos_data] if pedidos_data else []
+        mensajes_por_pedido = {}
+        historial_por_cliente = {}
+
+        if pedido_ids:
+            cursor.execute("SELECT * FROM pedido_mensajes WHERE id_pedido = ANY(%s) ORDER BY fecha ASC", (pedido_ids,))
+            for msg in cursor.fetchall():
+                pid = msg['id_pedido']
+                mensajes_por_pedido.setdefault(pid, []).append(msg)
+
+        for ped in pedidos_data:
+            uid = ped['id_usuario']
+            historial_por_cliente.setdefault(uid, []).append(ped)
+            
+    finally:
+        conn.close()    
+
+    paginacion = PaginacionDict(total, page, per_page)
     return render_template(
         'pedidos.html', 
         pedidos=pedidos_data, 
         mensajes=mensajes_por_pedido,
-        historial_clientes=historial_por_cliente
+        historial_clientes=historial_por_cliente,
+        paginacion=paginacion
     )
 
 
@@ -850,7 +902,7 @@ def cambiar_estado(id, nuevo_estado):
         flash(f"Error al actualizar estado: {str(e)}", "danger")
     finally:
         conn.close()
-    return redirect('/pedidos')
+    return redirect(request.referrer or url_for('pedidos'))
 
 @app.route('/admin/historial_cliente/<int:id_usuario>')
 @login_required
@@ -858,23 +910,34 @@ def cambiar_estado(id, nuevo_estado):
 def historial_cliente(id_usuario):
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    # 1. Consultar primero los datos del cliente (incluyendo apellidos)
+    cursor.execute("SELECT nombre, apellidos FROM usuario WHERE id = %s", (id_usuario,))
+    cliente_info = cursor.fetchone()
+    
+    if not cliente_info:
+        conn.close()
+        flash("El cliente solicitado no existe.", "danger")
+        return redirect(url_for('clientes'))
+        
+    # Unir nombre y apellidos para mandarlo a la vista
+    nombre_completo = f"{cliente_info['nombre']} {cliente_info['apellidos'] or ''}".strip()
+    
+    # 2. Consultar sus pedidos
     query = """
-        SELECT p.*, prod.nombre_producto, u.nombre as nombre_cliente
+        SELECT p.*, prod.nombre_producto
         FROM pedido p
         JOIN producto prod ON p.id_producto = prod.id
-        JOIN usuario u ON p.id_usuario = u.id
         WHERE p.id_usuario = %s
         ORDER BY p.fecha DESC
     """
     cursor.execute(query, (id_usuario,))
     pedidos_usuario = cursor.fetchall()
+    
     conn.close()
     
-    if not pedidos_usuario:
-        flash("Este cliente no tiene pedidos registrados.", "info")
-        return redirect('/pedidos')
-        
-    return render_template('admin/historial.html', pedidos=pedidos_usuario, cliente=pedidos_usuario[0]['nombre_cliente'])
+    # Renderizamos la plantilla (incluso si pedidos_usuario está vacío)
+    return render_template('admin/historial.html', pedidos=pedidos_usuario, cliente=nombre_completo)
 
 #####################################################21
 @app.route('/admin/seguridad')
@@ -986,45 +1049,112 @@ def actualizar_pago(id):
     return redirect(url_for('pedidos'))
 #####################################################25
 
-# --- GESTIÓN DE PRODUCTOS ---
 # ==========================================
-# --- VISTA DE PRODUCTOS ---
+# --- GESTION/VISTA DE PRODUCTOS ---
 # ==========================================
 @app.route('/productos')
 @login_required
 @admin_required
 def productos():
-    # Usamos SQL directo para que lea la nueva columna 'estado'
+    page, per_page = obtener_parametros_paginacion()
+    offset = (page - 1) * per_page
+    busqueda = request.args.get('q', '').strip()
+
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        cursor.execute("SELECT id, nombre_producto, precio, estado FROM producto ORDER BY id DESC")
+        # 1. Traer todas las categorías activas para los <select> de los modales
+        cursor.execute("SELECT id, nombre FROM categoria_producto WHERE estado = 'Activo' ORDER BY nombre")
+        categorias = cursor.fetchall()
+
+        if busqueda:
+            filtro = f"%{busqueda}%"
+            # Cuenta total de registros filtrados
+            cursor.execute("SELECT COUNT(*) AS total FROM producto WHERE nombre_producto ILIKE %s", (filtro,))
+            total = cursor.fetchone()['total']
+
+            # Trae registros filtrados y paginados (CON JOIN A CATEGORÍA)
+            cursor.execute("""
+                SELECT p.id, p.nombre_producto, p.precio, p.estado, p.id_categoria, c.nombre AS categoria_nombre 
+                FROM producto p
+                LEFT JOIN categoria_producto c ON p.id_categoria = c.id
+                WHERE p.nombre_producto ILIKE %s
+                ORDER BY p.id DESC 
+                LIMIT %s OFFSET %s
+            """, (filtro, per_page, offset))
+        else:
+            # Lógica original sin búsqueda
+            cursor.execute("SELECT COUNT(*) AS total FROM producto")
+            total = cursor.fetchone()['total']
+
+            # Trae registros (CON JOIN A CATEGORÍA)
+            cursor.execute("""
+                SELECT p.id, p.nombre_producto, p.precio, p.estado, p.id_categoria, c.nombre AS categoria_nombre 
+                FROM producto p
+                LEFT JOIN categoria_producto c ON p.id_categoria = c.id
+                ORDER BY p.id DESC 
+                LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
         lista_productos = cursor.fetchall()
     except Exception as e:
         print(f"Error cargando productos: {e}")
         lista_productos = []
+        categorias = []
+        total = 0
     finally:
         conn.close()
         
-    return render_template('productos.html', productos=lista_productos)
-################################
+    paginacion = PaginacionDict(total, page, per_page)
+    # 2. Enviamos 'categorias' a la plantilla
+    return render_template('productos.html', productos=lista_productos, categorias=categorias, paginacion=paginacion)
+
+# ==========================================
+# --- GUARDAR NUEVO PRODUCTO ---
+# ==========================================
 @app.route('/productos/guardar', methods=['POST'])
 @login_required
 @admin_required
 def guardar_producto():
     nombre = request.form.get('nombre_producto')
     precio = request.form.get('precio')
+    id_categoria = request.form.get('id_categoria')
+    imagen = request.files.get('imagen')
     
-    if nombre and precio:
-        nuevo_prod = Producto(nombre_producto=nombre, precio=float(precio))
+    if nombre and precio and id_categoria:
+        ruta_imagen_db = None
+        
+        # Procesar y guardar la imagen si existe
+        if imagen and imagen.filename != '':
+            filename = secure_filename(imagen.filename)
+            # Definir la carpeta destino
+            carpeta_destino = os.path.join(app.root_path, 'static', 'uploads', 'productos')
+            # Crear la carpeta si no existe
+            os.makedirs(carpeta_destino, exist_ok=True)
+            
+            # Guardar físicamente el archivo
+            ruta_guardado = os.path.join(carpeta_destino, filename)
+            imagen.save(ruta_guardado)
+            
+            # Ruta que se guardará en la base de datos
+            ruta_imagen_db = f'/static/uploads/productos/{filename}'
+
+        # Crear producto con categoría e imagen
+        nuevo_prod = Producto(
+            nombre_producto=nombre, 
+            precio=float(precio),
+            id_categoria=int(id_categoria),
+            imagen=ruta_imagen_db
+        )
         db.session.add(nuevo_prod)
         db.session.commit()
         flash("Producto creado exitosamente.", "success")
     else:
-        flash("Datos inválidos.", "danger")
+        flash("Datos inválidos. Asegúrate de completar todos los campos.", "danger")
         
     return redirect('/productos')
-######################
+
+
 # ==========================================
 # --- MODIFICAR PRODUCTOS Y PRECIOS ---
 # ==========================================
@@ -1038,14 +1168,30 @@ def editar_producto(id):
     # Actualizamos sus valores con los del formulario
     nuevo_nombre = request.form.get('nombre_producto')
     nuevo_precio = request.form.get('precio')
+    nueva_categoria = request.form.get('id_categoria')
+    nueva_imagen = request.files.get('imagen')
     
-    if nuevo_nombre and nuevo_precio:
+    if nuevo_nombre and nuevo_precio and nueva_categoria:
         producto.nombre_producto = nuevo_nombre
         producto.precio = float(nuevo_precio)
+        producto.id_categoria = int(nueva_categoria)
+        
+        # Procesar nueva imagen solo si el usuario subió una
+        if nueva_imagen and nueva_imagen.filename != '':
+            filename = secure_filename(nueva_imagen.filename)
+            carpeta_destino = os.path.join(app.root_path, 'static', 'uploads', 'productos')
+            os.makedirs(carpeta_destino, exist_ok=True)
+            
+            ruta_guardado = os.path.join(carpeta_destino, filename)
+            nueva_imagen.save(ruta_guardado)
+            
+            # Actualizamos la ruta en la base de datos
+            producto.imagen = f'/static/uploads/productos/{filename}'
+
         db.session.commit()
         flash(f"El producto '{producto.nombre_producto}' fue modificado exitosamente.", "success")
     else:
-        flash("Todos los campos son obligatorios.", "danger")
+        flash("Todos los campos obligatorios deben estar llenos.", "danger")
         
     return redirect('/productos')
 # ==========================================
@@ -1114,22 +1260,49 @@ def eliminar_producto(id):
 @login_required
 @admin_required
 def clientes():
+    page, per_page = obtener_parametros_paginacion()
+    offset = (page - 1) * per_page
+    busqueda = request.args.get('q', '').strip()
+
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
     try:
-        # ¡AQUÍ ESTÁ EL CAMBIO! Añadimos "estado" al SELECT
-        cursor.execute("SELECT id, nombre, documento, correo, telefono, estado FROM usuario ORDER BY id DESC")
+        if busqueda:
+            filtro = f"%{busqueda}%"
+            # Puedes buscar en múltiples columnas usando OR
+            query_count = "SELECT COUNT(*) AS total FROM usuario WHERE nombre ILIKE %s OR apellidos ILIKE %s OR documento ILIKE %s OR correo ILIKE %s"
+            cursor.execute(query_count, (filtro, filtro, filtro, filtro))
+            total = cursor.fetchone()['total']
+
+            query_data = """
+                SELECT id, nombre, apellidos, documento, correo, telefono, estado 
+                FROM usuario 
+                WHERE nombre ILIKE %s OR apellidos ILIKE %s OR documento ILIKE %s OR correo ILIKE %s
+                ORDER BY id DESC 
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(query_data, (filtro, filtro, filtro, filtro, per_page, offset))
+        else:
+            cursor.execute("SELECT COUNT(*) AS total FROM usuario")
+            total = cursor.fetchone()['total']
+
+            cursor.execute("""
+                SELECT id, nombre, apellidos, documento, correo, telefono, estado 
+                FROM usuario 
+                ORDER BY id DESC 
+                LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
         data = cursor.fetchall()
     except Exception as e:
         print(f"Error en BD: {e}")
         data = []
+        total = 0
     finally:
         conn.close()
     
-    if data is None:
-        data = []
-        
-    return render_template('admin/clientes.html', clientes=data)
+    paginacion = PaginacionDict(total, page, per_page)
+    return render_template('admin/clientes.html', clientes=data, paginacion=paginacion)
 
 # ==========================================
 # --- NUEVA RUTA: HABILITAR / INHABILITAR --
@@ -1284,6 +1457,30 @@ def enviar_mensaje(id_pedido):
     # Retorna a la vista anterior (sea la del cliente o la del administrador)
     return redirect(request.referrer or url_for('pedidos'))
 
+########################
+
+@app.route('/libro_reclamaciones', methods=['GET', 'POST'])
+def libro_reclamaciones():
+    if request.method == 'POST':
+        try:
+            nuevo_reclamo = Reclamo(
+                tipo_documento=request.form.get('tipo_documento'),
+                documento=request.form.get('documento'),
+                nombres=request.form.get('nombres'),
+                correo=request.form.get('correo'),
+                telefono=request.form.get('telefono'),
+                tipo=request.form.get('tipo', 'Reclamo'),
+                descripcion=request.form.get('descripcion')
+            )
+            db.session.add(nuevo_reclamo)
+            db.session.commit()
+            flash(f"Tu {nuevo_reclamo.tipo} ha sido registrado exitosamente con el ticket #{nuevo_reclamo.id}. Te contactaremos pronto.", "success")
+            return redirect(url_for('index'))
+        except Exception as e:
+            db.session.rollback()
+            flash("Ocurrió un error al registrar tu solicitud. Intenta nuevamente.", "danger")
+            
+    return render_template('libro_reclamaciones.html')
 ####################################################################
 @app.route('/nosotros')
 def nosotros():
@@ -1336,7 +1533,53 @@ def admin_nuevo_usuario_sistema():
 
     return render_template('admin/nuevo_usuario_sistema.html', tipos_doc=tipos_doc)
 
+#######
+@app.route('/admin/pedido/<int:id_pedido>')
+@login_required
+@admin_required
+def ver_detalle_pedido_individual(id_pedido):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # 1. Traer datos del pedido, el producto y el cliente
+        query = """
+            SELECT p.*, 
+                   pr.nombre_producto, pr.precio AS precio_unitario,
+                   u.nombre AS cliente_nombre, u.apellidos AS cliente_apellidos, 
+                   u.telefono AS cliente_telefono, u.correo AS cliente_correo
+            FROM pedido p
+            JOIN producto pr ON p.id_producto = pr.id
+            JOIN usuario u ON p.id_usuario = u.id
+            WHERE p.id = %s
+        """
+        cursor.execute(query, (id_pedido,))
+        pedido = cursor.fetchone()
 
+        if not pedido:
+            flash("El pedido solicitado no existe o fue eliminado.", "danger")
+            return redirect(url_for('pedidos'))
+
+        # 2. Traer la bitácora de mensajes de este pedido específico (si existe la tabla)
+        try:
+            cursor.execute("SELECT * FROM mensaje_pedido WHERE id_pedido = %s ORDER BY fecha ASC", (id_pedido,))
+            mensajes = cursor.fetchall()
+        except:
+            mensajes = [] # Por si tu tabla de mensajes se llama diferente
+
+    except Exception as e:
+        print(f"Error al cargar el detalle del pedido: {e}")
+        flash("Ocurrió un error al consultar el pedido.", "danger")
+        return redirect(url_for('pedidos'))
+    finally:
+        conn.close()
+
+    # Preparar campos calculados
+    pedido['cliente_completo'] = f"{pedido['cliente_nombre']} {pedido['cliente_apellidos'] or ''}".strip()
+    pedido['costo_total'] = float(pedido['cantidad'] * pedido['precio_unitario'])
+    pedido['saldo'] = float(pedido['costo_total'] - (pedido['adelanto'] or 0.0))
+
+    return render_template('admin/detalle_pedido.html', pedido=pedido, mensajes=mensajes)
 
 ###############################
 
@@ -1604,6 +1847,139 @@ def consultar_api():
         return jsonify({"error": f"Error de conexión: {str(e)}"}), 500
 
 #######
+
+@app.route('/admin/reportes')
+@login_required
+@admin_required
+def panel_reportes():
+    return render_template('admin/reportes.html')
+
+@app.route('/admin/reportes/generar', methods=['POST'])
+@login_required
+@admin_required
+def generar_reporte():
+    tipo_reporte = request.form.get('tipo_reporte')
+    formato = request.form.get('formato')
+    fecha_inicio = request.form.get('fecha_inicio')
+    fecha_fin = request.form.get('fecha_fin')
+    
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        if tipo_reporte == 'ventas':
+            # Consulta con cálculo real de recaudación y saldos
+            query = """
+                SELECT p.id AS "ID Pedido", 
+                       p.fecha AS "Fecha", 
+                       CONCAT(u.nombre, ' ', COALESCE(u.apellidos, '')) AS "Cliente",
+                       pr.nombre_producto AS "Producto", 
+                       p.cantidad AS "Cantidad",
+                       (p.cantidad * pr.precio) AS "Total General (S/)",
+                       COALESCE(
+                           (SELECT SUM(monto) FROM historial_pagos hp WHERE hp.id_pedido = p.id), 
+                           p.adelanto, 
+                           0
+                       ) AS "Recaudado/Abonado (S/)",
+                       ((p.cantidad * pr.precio) - COALESCE(
+                           (SELECT SUM(monto) FROM historial_pagos hp WHERE hp.id_pedido = p.id), 
+                           p.adelanto, 
+                           0
+                       )) AS "Saldo Pendiente (S/)",
+                       p.estado AS "Estado"
+                FROM pedido p
+                LEFT JOIN usuario u ON p.id_usuario = u.id
+                LEFT JOIN producto pr ON p.id_producto = pr.id
+                WHERE DATE(p.fecha) BETWEEN %s AND %s
+                ORDER BY p.fecha DESC
+            """
+            cursor.execute(query, (fecha_inicio, fecha_fin))
+            datos = cursor.fetchall()
+            nombre_archivo = f"Reporte_Ventas_{fecha_inicio}_al_{fecha_fin}"
+
+        elif tipo_reporte == 'deudores':
+            # Consulta de Cuentas por Cobrar
+            query = """
+                SELECT p.id AS "ID Pedido", 
+                       CONCAT(u.nombre, ' ', COALESCE(u.apellidos, '')) AS "Cliente",
+                       u.telefono AS "Teléfono",
+                       (p.cantidad * pr.precio) AS "Total General (S/)",
+                       COALESCE(
+                           (SELECT SUM(monto) FROM historial_pagos hp WHERE hp.id_pedido = p.id), 
+                           p.adelanto, 
+                           0
+                       ) AS "Abonado (S/)",
+                       ((p.cantidad * pr.precio) - COALESCE(
+                           (SELECT SUM(monto) FROM historial_pagos hp WHERE hp.id_pedido = p.id), 
+                           p.adelanto, 
+                           0
+                       )) AS "Deuda Pendiente (S/)"
+                FROM pedido p
+                LEFT JOIN usuario u ON p.id_usuario = u.id
+                LEFT JOIN producto pr ON p.id_producto = pr.id
+                WHERE ((p.cantidad * pr.precio) - COALESCE(
+                           (SELECT SUM(monto) FROM historial_pagos hp WHERE hp.id_pedido = p.id), 
+                           p.adelanto, 
+                           0
+                       )) > 0.01
+                ORDER BY "Deuda Pendiente (S/)" DESC
+            """
+            cursor.execute(query)
+            datos = cursor.fetchall()
+            nombre_archivo = "Reporte_Cuentas_Por_Cobrar"
+
+        if not datos:
+            flash("No se encontraron registros para el filtro seleccionado.", "warning")
+            return redirect(url_for('panel_reportes'))
+
+        # Formatear fechas para la salida visual/Excel
+        for d in datos:
+            if 'Fecha' in d and d['Fecha']:
+                d['Fecha_Str'] = d['Fecha'].strftime('%d/%m/%Y %H:%M')
+
+        # EXPORTACIÓN EXCEL
+        if formato == 'excel':
+            # Crear DataFrame limpiando campos innecesarios
+            df_datos = [{k: v for k, v in d.items() if k != 'Fecha'} for d in datos]
+            df = pd.DataFrame(df_datos)
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Reporte')
+                worksheet = writer.sheets['Reporte']
+                for idx, col in enumerate(df.columns):
+                    max_len = max(df[col].astype(str).map(len).max(), len(col)) + 3
+                    col_letter = openpyxl.utils.get_column_letter(idx + 1)
+                    worksheet.column_dimensions[col_letter].width = max_len
+
+            output.seek(0)
+            return send_file(output, download_name=f"{nombre_archivo}.xlsx", as_attachment=True)
+
+        # VISTA EJECUTIVA PARA PDF / IMPRESIÓN
+        elif formato == 'pdf':
+            total_general = sum(float(d.get('Total General (S/)', 0)) for d in datos)
+            total_recaudado = sum(float(d.get('Recaudado/Abonado (S/)', d.get('Abonado (S/)', 0))) for d in datos)
+            total_pendiente = sum(float(d.get('Saldo Pendiente (S/)', d.get('Deuda Pendiente (S/)', 0))) for d in datos)
+
+            resumen = {
+                'total_general': total_general,
+                'total_recaudado': total_recaudado,
+                'total_pendiente': total_pendiente,
+                'cantidad_registros': len(datos)
+            }
+            return render_template(
+                'admin/reporte_pdf.html', 
+                datos=datos, 
+                resumen=resumen,
+                titulo=tipo_reporte.upper(),
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin
+            )
+
+    finally:
+        conn.close()
+
+
+##########################
 # ==========================================
 # RUTAS PARA UBIGEO LOCAL (DEPARTAMENTO, PROVINCIA, DISTRITO)
 # ==========================================
@@ -1790,14 +2166,25 @@ def gestion_inventario():
             flash('Error al guardar el insumo.', 'danger')
         return redirect(url_for('gestion_inventario'))
         
-    cursor.execute("SELECT * FROM inventario ORDER BY nombre_insumo ASC")
+    page, per_page = obtener_parametros_paginacion()
+    offset = (page - 1) * per_page
+
+    cursor.execute("SELECT COUNT(*) AS total FROM inventario")
+    total = cursor.fetchone()['total']
+
+    cursor.execute("""
+        SELECT * FROM inventario 
+        ORDER BY nombre_insumo ASC 
+        LIMIT %s OFFSET %s
+    """, (per_page, offset))
     insumos = cursor.fetchall()
     
     cursor.execute("SELECT id, razon_social FROM proveedor WHERE estado = 'Activo'")
     proveedores = cursor.fetchall()
     
     conn.close()
-    return render_template('admin/inventario.html', insumos=insumos, proveedores=proveedores)
+    paginacion = PaginacionDict(total, page, per_page)
+    return render_template('admin/inventario.html', insumos=insumos, proveedores=proveedores, paginacion=paginacion)
 
 @app.route('/admin/inventario/movimiento', methods=['POST'])
 @login_required

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-tetra-dark text-white p-4">
+                    <h2 class="mb-0 h4"><i class="bi bi-journal-text me-2"></i>Libro de Reclamaciones</h2>
+                    <p class="mb-0 mt-2 small text-light">Hoja de Reclamación Virtual</p>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('libro_reclamaciones') }}">
+                        <h5 class="text-tetra-green mb-3 border-bottom pb-2">1. Identificación del Consumidor</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label">Tipo de Doc.</label>
+                                <select name="tipo_documento" class="form-select" required>
+                                    <option value="DNI">DNI</option>
+                                    <option value="CE">CE</option>
+                                    <option value="RUC">RUC</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Número de Documento</label>
+                                <input type="text" name="documento" class="form-control" required>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Nombres y Apellidos / Razón Social</label>
+                                <input type="text" name="nombres" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo Electrónico</label>
+                                <input type="email" name="correo" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Teléfono</label>
+                                <input type="text" name="telefono" class="form-control">
+                            </div>
+                        </div>
+
+                        <h5 class="text-tetra-green mb-3 border-bottom pb-2">2. Detalle de la Reclamación</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-12">
+                                <label class="form-label">Tipo</label>
+                                <div class="d-flex gap-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="tipo" id="tipoReclamo" value="Reclamo" checked>
+                                        <label class="form-check-label" for="tipoReclamo">
+                                            <strong>Reclamo:</strong> Disconformidad relacionada a los productos o servicios.
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="tipo" id="tipoQueja" value="Queja">
+                                        <label class="form-check-label" for="tipoQueja">
+                                            <strong>Queja:</strong> Disconformidad no relacionada a los productos o servicios; o, malestar o descontento respecto a la atención al público.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Detalle del reclamo o queja</label>
+                                <textarea name="descripcion" class="form-control" rows="5" required></textarea>
+                            </div>
+                        </div>
+
+                        <div class="text-end mt-4">
+                            <button type="submit" class="btn btn-primary px-4 py-2">Enviar Solicitud</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

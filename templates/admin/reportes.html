@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark m-0"><i class="bi bi-bar-chart-fill text-success"></i> Panel de Reportes Financieros</h2>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-dark fw-bold shadow-sm">
+            <i class="bi bi-arrow-left"></i> Volver al Dashboard
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-header bg-dark text-white rounded-top-4 py-3">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Exportar Información de Ventas</h5>
+                </div>
+                <div class="card-body p-4 bg-light">
+                    <form action="{{ url_for('generar_reporte') }}" method="POST">
+                        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>{% endif %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-muted">1. Selecciona el Módulo</label>
+                            <select name="tipo_reporte" class="form-select form-select-lg shadow-sm border-0" required>
+                                <option value="ventas">📈 Reporte General de Ventas e Ingresos</option>
+                                <option value="deudores">⚠️ Cuentas por Cobrar (Saldos Pendientes)</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-muted">2. Rango de Fechas</label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <input type="date" name="fecha_inicio" id="fecha_inicio" class="form-control border-0 shadow-sm" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="date" name="fecha_fin" id="fecha_fin" class="form-control border-0 shadow-sm" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-muted">3. Formato de Salida</label>
+                            <div class="d-flex gap-4 mt-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="formato" id="formatoExcel" value="excel" checked>
+                                    <label class="form-check-label fw-bold text-success" for="formatoExcel">
+                                        <i class="bi bi-file-earmark-excel-fill fs-5"></i> Microsoft Excel (.xlsx)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="formato" id="formatoPdf" value="pdf">
+                                    <label class="form-check-label fw-bold text-danger" for="formatoPdf">
+                                        <i class="bi bi-file-earmark-pdf-fill fs-5"></i> Reporte PDF Ejecutivo (Imprimible)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-dark btn-lg w-100 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-cloud-download"></i> Generar Reporte
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Asignar por defecto el día de hoy en el filtro de fechas
+    document.addEventListener("DOMContentLoaded", function() {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById("fecha_inicio").value = hoy;
+        document.getElementById("fecha_fin").value = hoy;
+    });
+</script>
+{% endblock %}

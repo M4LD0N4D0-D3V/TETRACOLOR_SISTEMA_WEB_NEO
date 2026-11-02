@@ -8,39 +8,35 @@
         font-family: 'Montserrat', sans-serif; 
     }
 
-    /* Banner Principal de Ancho Completo */
+    /* Banner Principal - Diseño Contenido y Elegante */
     .hero-banner-wrapper {
-        width: 100vw;
-        position: relative;
-        left: 50%;
-        right: 50%;
-        margin-left: -50vw;
-        margin-right: -50vw;
-        height: 380px;
+        border-radius: 16px;
+        height: 260px;
         background-color: #000;
         overflow: hidden;
+        position: relative;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     }
 
     .hero-banner-img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        opacity: 0.45;
+        opacity: 0.4;
     }
 
     .hero-banner-overlay {
         position: absolute;
         inset: 0;
-        background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.8) 100%);
+        background: linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 100%);
         display: flex;
         flex-direction: column;
         justify-content: center;
-        align-items: center;
-        text-center;
-        padding: 2rem;
+        align-items: flex-start;
+        padding: 3rem;
     }
 
-    /* Grilla Bento Responsiva */
+    /* Grilla Bento Responsiva (El Catálogo Original) */
     .bento-grid {
         display: grid;
         grid-template-columns: repeat(12, 1fr);
@@ -152,67 +148,70 @@
     }
 </style>
 
-<!-- HERO BANNER BORDE A BORDE -->
-<div class="hero-banner-wrapper text-cinematic mb-5">
-    <img src="{{ url_for('static', filename='assets/logo/bann.jpg') }}" alt="TETRACOLOR Banner" class="hero-banner-img">
-    <div class="hero-banner-overlay">
-        <h1 class="display-4 fw-bold text-success text-shadow mb-2">Estampados y Etiquetas</h1>
-        <p class="lead fs-5 text-light mb-3">Calidad, innovación y rapidez para tus prendas de vestir.</p>
-        <a href="#catalogo" class="btn btn-success btn-lg rounded-pill px-5 fw-bold shadow-sm">
-            Ver Catálogo de Servicios
-        </a>
-    </div>
-</div>
-
-<div class="container text-cinematic py-2" id="catalogo">
-    <div class="text-center mb-5">
-        <h2 class="fw-bold display-6 text-uppercase text-dark mb-2">Catálogo de Servicios</h2>
-        <div class="mx-auto bg-success rounded" style="width: 60px; height: 4px;"></div>
+<div class="container text-cinematic py-3">
+    
+    <!-- HERO BANNER (Nuevo, compacto) -->
+    <div class="hero-banner-wrapper mb-5">
+        <img src="{{ url_for('static', filename='assets/logo/bann.jpg') }}" alt="TETRACOLOR Banner" class="hero-banner-img">
+        <div class="hero-banner-overlay text-white">
+            <h1 class="fw-bold mb-2" style="font-size: 2.2rem; color: #ffffff;">Estampados y Etiquetas</h1>
+            <p class="fs-6 mb-4 opacity-75" style="max-width: 500px; font-family: 'Open Sans', sans-serif;">Calidad, innovación y rapidez para tus prendas de vestir. Resultados notables para tu marca.</p>
+            <a href="#catalogo" class="btn btn-success rounded-pill px-4 py-2 fw-bold shadow-sm" style="font-size: 0.9rem;">
+                Ver Servicios
+            </a>
+        </div>
     </div>
 
-    <!-- GRILLA BENTO CON IMÁGENES DE FONDO -->
-    <div class="bento-grid mb-5">
-        {% for c in categorias %}
-        <a href="/categoria/{{ c.id }}" class="bento-item shadow-sm">
-            {% if c.imagen %}
-                <img src="{{ c.imagen }}" alt="{{ c.nombre }}" class="bento-bg">
-            {% else %}
-                <img src="https://images.unsplash.com/photo-1562157873-818bc0726f68?auto=format&fit=crop&q=80&w=800" alt="{{ c.nombre }}" class="bento-bg">
-            {% endif %}
-            
-            <div class="bento-overlay"></div>
-            
-            <div class="bento-content">
-                <h3 class="bento-title">{{ c.nombre }}</h3>
-                {% if c.descripcion %}
-                    <p class="bento-desc">{{ c.descripcion }}</p>
+    <!-- CATÁLOGO (Tu Bento Grid favorito restaurado) -->
+    <div id="catalogo" class="mb-5">
+        <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+            <h2 class="fw-bold fs-4 text-uppercase text-dark m-0">Catálogo de Servicios</h2>
+        </div>
+
+        <div class="bento-grid">
+            {% for c in categorias %}
+            <a href="/categoria/{{ c.id }}" class="bento-item shadow-sm">
+                {% if c.imagen %}
+                    <img src="{{ c.imagen }}" alt="{{ c.nombre }}" class="bento-bg">
+                {% else %}
+                    <img src="https://images.unsplash.com/photo-1562157873-818bc0726f68?auto=format&fit=crop&q=80&w=800" alt="{{ c.nombre }}" class="bento-bg">
                 {% endif %}
-                <span class="btn-bento">Explorar <i class="bi bi-arrow-right ms-1"></i></span>
-            </div>
-        </a>
-        {% endfor %}
+                
+                <div class="bento-overlay"></div>
+                
+                <div class="bento-content">
+                    <h3 class="bento-title">{{ c.nombre }}</h3>
+                    {% if c.descripcion %}
+                        <p class="bento-desc">{{ c.descripcion }}</p>
+                    {% endif %}
+                    <span class="btn-bento">Explorar <i class="bi bi-arrow-right ms-1"></i></span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
     </div>
 
-    <!-- SECCIÓN UBÍCANOS -->
-    <div id="ubicacion" class="my-5 py-4 border-top">
-        <div class="card border-0 rounded-4 shadow bg-white overflow-hidden">
-            <div class="card-body p-4 p-md-5">
+    <!-- SECCIÓN UBÍCANOS (Nueva, limpia) -->
+    <div id="ubicacion" class="mb-5">
+        <div class="card border border-light-subtle rounded-4 shadow-sm bg-white overflow-hidden">
+            <div class="card-body p-4">
                 <div class="row align-items-center">
-                    <div class="col-md-2 text-center mb-3 mb-md-0">
-                        <div class="bg-success text-white p-3 rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                            <i class="bi bi-geo-alt-fill display-5"></i>
+                    <div class="col-auto text-center mb-3 mb-md-0 pe-md-4">
+                        <div class="bg-success text-white p-3 rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 70px; height: 70px;">
+                            <i class="bi bi-geo-alt-fill fs-2"></i>
                         </div>
                     </div>
-                    <div class="col-md-10">
-                        <span class="badge bg-dark mb-2 py-2 px-3 fw-semibold">SEDE PRINCIPAL - HUANCAYO</span>
-                        <h4 class="fw-bold mb-1">Galería Industriales Wanka</h4>
-                        <p class="text-secondary mb-1">Prolongación Ica 137, Stand 22 - 3er Nivel</p>
-                        <p class="small text-muted mb-0">Atención de Lunes a Sábado de 8:00 AM a 7:30 PM para muestras físicas de acabados y pedidos masivos.</p>
+                    <div class="col">
+                        <span class="badge bg-dark mb-2 py-1 px-2 fw-semibold" style="font-size: 0.75rem;">SEDE PRINCIPAL - HUANCAYO</span>
+                        <h4 class="fw-bold mb-1 fs-5">Galería Industriales Wanka</h4>
+                        <p class="text-secondary mb-1 small fw-semibold">Prolongación Ica 137, Stand 22 - 3er Nivel</p>
+                        <p class="small text-muted mb-0" style="font-family: 'Open Sans', sans-serif;">Atención de Lunes a Sábado de 8:00 AM a 7:30 PM para muestras físicas de acabados y pedidos masivos.</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
 </div>
 
 {% endblock %}

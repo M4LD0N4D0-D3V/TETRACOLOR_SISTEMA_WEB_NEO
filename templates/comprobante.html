@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    @media print {
+        body { background-color: #fff !important; }
+        .no-print { display: none !important; }
+        .ticket-container { box-shadow: none !important; border: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important;}
+        nav, footer { display: none !important; }
+    }
+    .ticket-container {
+        max-width: 600px; /* Tamaño más compacto */
+        margin: 0 auto;
+    }
+    .comprobante-header {
+        border-bottom: 1px dashed #000;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+</style>
+
+<div class="container py-4 max-w-75">
+    <div class="d-flex justify-content-between align-items-center mb-3 no-print ticket-container">
+        <button onclick="window.close()" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-x-circle"></i> Cerrar Pestaña
+        </button>
+        <button onclick="window.print()" class="btn btn-sm btn-success fw-bold shadow-sm">
+            <i class="bi bi-printer"></i> Imprimir / PDF
+        </button>
+    </div>
+
+    <div class="card shadow-sm border rounded-3 ticket-container">
+        <div class="card-body p-4">
+            
+            <div class="comprobante-header text-center">
+                <h3 class="fw-bold text-dark mb-0">TETRACOLOR</h3>
+                <p class="small text-muted mb-1">Servicios Gráficos y Publicitarios</p>
+                
+                <!-- Cálculo de saldo asegurando que los valores sean números -->
+                {% set precio = pedido.precio|float if pedido.precio else 0 %}
+                {% set cantidad = pedido.cantidad|int if pedido.cantidad else 1 %}
+                {% set total_importe = precio * cantidad %}
+                {% set adelanto = pedido.adelanto|float if pedido.adelanto else 0 %}
+                {% set saldo = total_importe - adelanto %}
+
+                <!-- Título Dinámico -->
+                <h6 class="fw-bold mt-3 mb-0">
+                    {% if saldo <= 0 %}
+                        COMPROBANTE DE PAGO #{{ pedido.id }}
+                    {% else %}
+                        ORDEN DE SERVICIO #{{ pedido.id }}
+                    {% endif %}
+                </h6>
+                <small class="text-muted">Fecha: {{ pedido.fecha|lima_time if pedido.fecha else 'N/A' }}</small>
+            </div>
+
+            <!-- Datos del Cliente coincidiendo con tu SQL (u.nombre, u.documento, u.correo) -->
+            <div class="row mb-3" style="font-size: 0.9rem;">
+                <div class="col-12">
+                    <p class="mb-1"><strong>Cliente:</strong> {{ pedido.nombre }} {{ pedido.apellidos }}</p>
+                    <p class="mb-1"><strong>Documento:</strong> {{ pedido.documento or 'No registrado' }}</p>
+                    <p class="mb-1"><strong>Correo:</strong> {{ pedido.correo or 'No registrado' }}</p>
+                </div>
+            </div>
+
+            <table class="table table-sm table-bordered mb-3" style="font-size: 0.9rem;">
+                <thead class="table-light text-center">
+                    <tr>
+                        <th style="width: 10%;">Cant.</th>
+                        <th>Descripción</th>
+                        <th style="width: 25%;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-center align-middle">{{ cantidad }}</td>
+                        <td>
+                            <!-- Coincidiendo con pr.nombre_producto de tu SQL -->
+                            <strong>{{ pedido.nombre_producto }}</strong><br>
+                            <small class="text-muted">{{ pedido.especificaciones or '' }}</small>
+                        </td>
+                        <td class="text-end align-middle fw-bold">S/ {{ "%.2f"|format(total_importe) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="d-flex justify-content-end" style="font-size: 0.9rem;">
+                <table class="table table-sm table-borderless w-auto mb-0">
+                    <tr>
+                        <td class="text-end pe-3">Importe Total:</td>
+                        <td class="text-end fw-bold">S/ {{ "%.2f"|format(total_importe) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-end pe-3">Abonado:</td>
+                        <td class="text-end text-success">S/ {{ "%.2f"|format(adelanto) }}</td>
+                    </tr>
+                    <tr class="border-top">
+                        <td class="text-end pe-3"><strong>Saldo:</strong></td>
+                        <td class="text-end fw-bold {% if saldo > 0 %}text-danger{% else %}text-success{% endif %}">
+                            S/ {{ "%.2f"|format(saldo if saldo > 0 else 0) }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="text-center mt-4 pt-3 border-top text-muted" style="font-size: 0.75rem;">
+                <p class="mb-0">Gracias por confiar en Tetracolor.</p>
+                <p class="mb-0">Documento de control interno (No válido para fines tributarios).</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

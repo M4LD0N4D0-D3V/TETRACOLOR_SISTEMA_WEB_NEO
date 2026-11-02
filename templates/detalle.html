@@ -1,11 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container py-5">
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
+<div class="container py-2">
+    <!-- Navegación súper compacta -->
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb small mb-1">
             <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-success">Catálogo</a></li>
-            
-            <!-- Enlace intermedio hacia la categoría del producto -->
             {% if producto.categoria %}
             <li class="breadcrumb-item">
                 <a href="/categoria/{{ producto.id_categoria }}" class="text-decoration-none text-success">
@@ -13,101 +12,110 @@
                 </a>
             </li>
             {% endif %}
-            
-            <li class="breadcrumb-item active" aria-current="page">{{ producto.nombre_producto }}</li>
+            <li class="breadcrumb-item active fw-bold" aria-current="page">{{ producto.nombre_producto }}</li>
         </ol>
     </nav>
 
-    <div class="card shadow border-0 rounded-4 overflow-hidden mb-5">
+    <!-- Tarjeta Principal Compacta -->
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-2">
         <div class="row g-0">
-            <!-- COLUMNA IZQUIERDA: IMAGEN Y DESCRIPCIÓN (SEGÚN BOCETO) -->
-            <div class="col-md-6">
-                <img src="{{ producto.imagen if producto.imagen else 'https://via.placeholder.com/600x500?text=Sin+Imagen' }}" class="img-fluid w-100" style="object-fit: cover; min-height: 400px;" alt="{{ producto.nombre_producto }}">
+            
+            <!-- COLUMNA IZQUIERDA: IMAGEN + DESCRIPCIÓN + PROMOCIÓN -->
+            <div class="col-lg-5 col-md-6 bg-light d-flex flex-column border-end">
+                <!-- Imagen con altura máxima restringida para ahorrar espacio vertical -->
+                <img src="{{ producto.imagen if producto.imagen else 'https://via.placeholder.com/600x500?text=Sin+Imagen' }}" 
+                     class="img-fluid w-100" style="object-fit: cover; max-height: 280px;" alt="{{ producto.nombre_producto }}">
                 
-                <div class="p-4 bg-light border-top">
-                    <h5 class="fw-bold">Descripción del Servicio:</h5>
-                    <p class="text-muted mb-0">
+                <div class="p-3 bg-white">
+                    <h6 class="fw-bold" style="font-size: 0.9rem;">Descripción del Servicio:</h6>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem; line-height: 1.4;">
                         {{ producto.descripcion if producto.descripcion else 'Servicio profesional garantizado por TETRACOLOR.' }}
                     </p>
                 </div>
+
+                <!-- NUEVO: CAJA DE PROMOCIÓN DE DESCUENTOS -->
+                <div class="p-3 bg-warning-subtle border-top border-warning mt-auto">
+                    <h6 class="fw-bold text-dark mb-1" style="font-size: 0.85rem;">
+                        <i class="bi bi-tags-fill text-warning"></i> Promoción por Cantidad
+                    </h6>
+                    <ul class="mb-0 text-dark ps-3" style="font-size: 0.75rem;">
+                        <li>De <strong>6 a 11 unidades:</strong> obtén <strong>10% de descuento</strong> en el total.</li>
+                        <li>De <strong>12 a más unidades:</strong> obtén <strong>20% de descuento</strong> en el total.</li>
+                    </ul>
+                </div>
             </div>
             
-            <!-- COLUMNA DERECHA: FORMULARIO (SEGÚN BOCETO) -->
-            <div class="col-md-6 bg-white p-5 d-flex flex-column justify-content-center">
+            <!-- COLUMNA DERECHA: FORMULARIO SÚPER COMPACTO -->
+            <div class="col-lg-7 col-md-6 bg-white p-3 p-md-4 d-flex flex-column justify-content-center">
                 
-                <!-- Banderín de Precio al Mayor -->
-                {% if producto.precio_mayor and producto.precio_mayor > 0 %}
-                <div class="alert alert-success py-2 mb-3 fw-bold small text-center rounded-pill">
-                    <i class="bi bi-tag-fill"></i> ¡Lleva {{ producto.cantidad_minima_mayor }} o más unidades a S/ {{ "%.2f"|format(producto.precio_mayor) }} c/u!
-                </div>
-                {% endif %}
-
-                <h1 class="fw-bold mb-2">{{ producto.nombre_producto }}</h1>
-                <p class="text-muted mb-4">Personaliza los materiales y genera tu cotización.</p>
+                <h2 class="fw-bold mb-0 fs-4">{{ producto.nombre_producto }}</h2>
+                <h4 class="text-danger fw-bold mb-3" style="font-size: 1.1rem;">
+                    S/ {{ "%.2f"|format(producto.precio) }} <small class="text-muted fw-normal" style="font-size: 0.8rem;">(Precio Base Unitario)</small>
+                </h4>
                 
                 <form action="/crear_pedido_cliente" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="id_producto" value="{{ producto.id }}">
-                    
-                    <!-- Mostrar Precio Dinámico -->
-                    <h3 class="text-danger fw-bold mb-4" id="precio_mostrar">
-                        S/ {{ "%.2f"|format(producto.precio) }}
-                        <small class="text-muted fs-6 fw-normal">(Precio Unitario)</small>
-                    </h3>
 
-                    <!-- DIBUJAR SELECTORES DINÁMICOS SEGÚN LA CATEGORÍA DEL PRODUCTO -->
-                    <div id="contenedor_materiales">
+                    <!-- Opciones agrupadas en dos columnas para ahorrar espacio -->
+                    <div class="row g-2 mb-2" id="contenedor_materiales">
                         {% for tipo, opciones in opciones_agrupadas.items() %}
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-dark">{{ tipo }}:</label>
-                            <select name="variacion_{{ tipo|replace(' ', '_')|lower }}" class="form-select border-dark variacion-select" required>
-                                <option value="" disabled selected>-- Selecciona un/a {{ tipo }} --</option>
-                                
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label fw-bold text-dark mb-1" style="font-size: 0.8rem;">{{ tipo }}:</label>
+                            <!-- Se usa form-select-sm para reducir altura -->
+                            <select name="variacion_{{ tipo|replace(' ', '_')|lower }}" class="form-select form-select-sm border-dark variacion-select" required>
+                                <option value="" data-costo="0" disabled selected>-- Selecciona --</option>
                                 {% for op in opciones %}
                                     <option value="{{ op.nombre }}" data-costo="{{ op.costo_extra }}">
-                                        {{ op.nombre }} 
-                                        {% if op.costo_extra > 0 %} (+ S/ {{ "%.2f"|format(op.costo_extra) }}) {% endif %}
+                                        {{ op.nombre }} {% if op.costo_extra > 0 %} (+S/{{ "%.2f"|format(op.costo_extra) }}) {% endif %}
                                     </option>
                                 {% endfor %}
-                                
                             </select>
                         </div>
                         {% else %}
-                            <!-- Si el producto no requiere materiales extra, mostramos un mensaje o lo dejamos en blanco -->
-                            <div class="alert alert-light text-muted small">Este producto no requiere configuración de materiales.</div>
+                            <div class="col-12"><div class="alert alert-light text-muted small p-2 m-0">No requiere configuración extra.</div></div>
                         {% endfor %}
                     </div>
 
-                    <div class="mb-3">
-                        <label for="imagen_diseno" class="form-label fw-bold">Adjuntar Diseño / Logo (Opcional):</label>
-                        <input class="form-control" type="file" id="imagen_diseno" name="imagen_diseno" accept="image/png, image/jpeg, image/jpg, application/pdf">
+                    <!-- Diseño y Notas en una misma fila -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-sm-6">
+                            <label for="imagen_diseno" class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Diseño (Opcional):</label>
+                            <input class="form-control form-control-sm" type="file" id="imagen_diseno" name="imagen_diseno" accept="image/png, image/jpeg, application/pdf">
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Notas:</label>
+                            <textarea name="notas" class="form-control form-control-sm" rows="1" placeholder="Ej: Logo 5x5cm..."></textarea>
+                        </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Instrucciones / Notas:</label>
-                        <textarea name="notas" class="form-control" rows="2" placeholder="Ej: Logo de 5x5cm en el pecho..."></textarea>
-                    </div>
-
-                    <div class="mb-4 row align-items-center">
+                    <!-- Fila de Cálculo Total con Descuentos Dinámicos -->
+                    <div class="row align-items-center bg-light p-2 rounded-3 border g-2 mb-3">
                         <div class="col-auto">
-                            <label class="form-label fw-bold mb-0">Cantidad:</label>
+                            <label class="form-label fw-bold mb-0 small">Cant:</label>
                         </div>
-                        <div class="col-4">
-                            <input type="number" name="cantidad" id="input_cantidad" class="form-control text-center fw-bold border-dark" value="1" min="1" required>
+                        <div class="col-4 col-sm-3">
+                            <input type="number" name="cantidad" id="input_cantidad" class="form-control form-control-sm text-center fw-bold border-dark" value="1" min="1" required>
                         </div>
-                        <div class="col-auto">
-                            <h5 class="fw-bold text-success mb-0" id="total_mostrar">Total: S/ {{ "%.2f"|format(producto.precio) }}</h5>
+                        <div class="col text-end">
+                            <!-- Aquí se mostrará el tachado y el aviso de ahorro si aplica -->
+                            <div id="info_descuento" class="text-danger fw-bold d-none" style="font-size: 0.75rem; line-height: 1;"></div>
+                            <h5 class="fw-bold text-success mb-0 mt-1" id="total_mostrar">Total: S/ 0.00</h5>
                         </div>
                     </div>
-
-                    <div class="mt-4">
+                    <!-- Nueva Fila: Sugerencia de Fecha -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-12">
+                            <label for="fecha_sugerida" class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Fecha sugerida para entrega (Sujeta a confirmación):</label>
+                            <input type="date" class="form-control form-control-sm border-dark" id="fecha_sugerida" name="fecha_sugerida" required>
+                        </div>
+                    </div>
+                    <div>
                         {% if 'usuario_id' in session %}
-                            <button type="submit" class="btn btn-tetra-green w-100 py-3 fw-bold fs-5 text-white shadow-sm" style="background-color: #198754;">
+                            <button type="submit" class="btn btn-success btn-sm w-100 py-2 fw-bold fs-6 shadow-sm">
                                 GENERAR PEDIDO
                             </button>
                         {% else %}
-                            <div class="alert alert-light border text-center">
-                                <a href="/login" class="btn btn-dark w-100 fw-bold">Iniciar Sesión para Pedir</a>
-                            </div>
+                            <a href="/login" class="btn btn-dark btn-sm w-100 py-2 fw-bold">Iniciar Sesión para Pedir</a>
                         {% endif %}
                     </div>
                 </form>
@@ -116,35 +124,68 @@
     </div>
 </div>
 
-<!-- SCRIPT PARA CALCULAR PRECIO DINÁMICO EN TIEMPO REAL -->
+<!-- LÓGICA DE CÁLCULO DE DESCUENTOS Y EXTRAS -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const inputCantidad = document.getElementById("input_cantidad");
-    const precioMostrar = document.getElementById("precio_mostrar");
     const totalMostrar = document.getElementById("total_mostrar");
+    const infoDescuento = document.getElementById("info_descuento");
+    const selectsVariaciones = document.querySelectorAll('.variacion-select');
 
-    // Variables inyectadas desde el Backend
-    const precioUnitario = parseFloat("{{ producto.precio }}");
-    const precioMayor = parseFloat("{{ producto.precio_mayor or producto.precio }}");
-    const minMayor = parseInt("{{ producto.cantidad_minima_mayor or 12 }}");
+    // Tomamos el precio base unitario de la base de datos
+    const precioBase = parseFloat("{{ producto.precio }}");
 
-    inputCantidad.addEventListener("input", function() {
-        let cantidad = parseInt(this.value) || 1;
-        let precioAplicado = precioUnitario;
-        let tipoPrecio = "(Precio Unitario)";
+    function recalcularPrecios() {
+        let cantidad = parseInt(inputCantidad.value) || 1;
+        let costoExtras = 0;
 
-        // Lógica de Descuento por Mayor
-        if (precioMayor > 0 && cantidad >= minMayor) {
-            precioAplicado = precioMayor;
-            tipoPrecio = "<span class='text-success'>(¡Precio al por Mayor Aplicado!)</span>";
+        // Sumar todos los adicionales seleccionados (+5, +3.50, etc.)
+        selectsVariaciones.forEach(select => {
+            if (select.selectedIndex > 0) {
+                let opcionSeleccionada = select.options[select.selectedIndex];
+                costoExtras += parseFloat(opcionSeleccionada.getAttribute('data-costo')) || 0;
+            }
+        });
+
+        // Subtotal antes de descuentos (Precio Base + Materiales Extra) * Cantidad
+        let precioUnitarioReal = precioBase + costoExtras;
+        let subtotal = precioUnitarioReal * cantidad;
+        
+        let descuentoPorcentaje = 0;
+
+        // Lógica de Tramos de Descuento
+        if (cantidad >= 12) {
+            descuentoPorcentaje = 0.20; // 20% por docena o más
+        } else if (cantidad >= 6) {
+            descuentoPorcentaje = 0.10; // 10% de 6 a 11
         }
 
-        let total = precioAplicado * cantidad;
+        let montoDescuento = subtotal * descuentoPorcentaje;
+        let totalFinal = subtotal - montoDescuento;
 
-        // Actualizar la interfaz
-        precioMostrar.innerHTML = `S/ ${precioAplicado.toFixed(2)} <small class="fs-6 fw-normal">${tipoPrecio}</small>`;
-        totalMostrar.innerHTML = `Total: S/ ${total.toFixed(2)}`;
-    });
+        // Actualizar la Interfaz Gráfica
+        if (descuentoPorcentaje > 0) {
+            infoDescuento.classList.remove('d-none');
+            // Muestra el porcentaje y subtotal original tachado
+            infoDescuento.innerHTML = `
+                <span class="text-muted text-decoration-line-through">S/ ${subtotal.toFixed(2)}</span> 
+                (-${descuentoPorcentaje * 100}%)
+                <br><span class="text-warning-emphasis">Ahorras S/ ${montoDescuento.toFixed(2)}</span>
+            `;
+        } else {
+            infoDescuento.classList.add('d-none');
+            infoDescuento.innerHTML = "";
+        }
+
+        totalMostrar.innerHTML = `Total: S/ ${totalFinal.toFixed(2)}`;
+    }
+
+    // Ejecutar al cambiar cualquier valor
+    inputCantidad.addEventListener("input", recalcularPrecios);
+    selectsVariaciones.forEach(select => select.addEventListener("change", recalcularPrecios));
+    
+    // Ejecutar al cargar la página
+    recalcularPrecios();
 });
 </script>
 {% endblock %}

@@ -6,6 +6,15 @@
         <span class="badge bg-dark fs-6 py-2">Cliente: {{ session.nombre }}</span>
     </div>
 
+    <!-- Banner de Educación para el Chat -->
+    <div class="alert alert-info d-flex align-items-center mb-4 shadow-sm" role="alert" style="border-left: 4px solid #0dcaf0; background-color: #f8f9fa;">
+        <span class="me-3 fs-3">💡</span>
+        <div>
+            <strong>¿Tienes dudas o quieres coordinar detalles de tu pedido?</strong><br>
+            Usa el chat en el botón <em>"Ver Constatación e Historial"</em> de cada tarjeta para hablar directamente con nuestro equipo.
+        </div>
+    </div>
+
     <div class="row">
         {% for pedido in pedidos %}
         <div class="col-md-6 mb-4">
@@ -27,9 +36,16 @@
                         {% endif %}
                     </div>
 
-                    <p class="card-text text-dark">
+                    <p class="card-text text-dark mb-2">
                         <strong>Producto:</strong> {{ pedido.producto if pedido.producto else pedido.nombre_producto }} <br>
                         <strong>Descripción:</strong> {{ pedido.especificaciones }}
+                        
+                        <!-- Etiqueta dinámica de descuento aplicada según la cantidad -->
+                        {% if pedido.cantidad >= 12 %}
+                            <br><span class="badge bg-warning-subtle text-dark border border-warning mt-1"><i class="bi bi-tags"></i> 20% de descuento aplicado por cantidad</span>
+                        {% elif pedido.cantidad >= 6 %}
+                            <br><span class="badge bg-warning-subtle text-dark border border-warning mt-1"><i class="bi bi-tags"></i> 10% de descuento aplicado por cantidad</span>
+                        {% endif %}
                     </p>
 
                     <div class="bg-light p-3 rounded-3 mb-3 border shadow-sm">
@@ -65,10 +81,28 @@
                         <!-- INPUT Y BOTÓN PARA PAGO PARCIAL O COMPLETO -->
                         {% set saldo = pedido.total_pagado - pedido.adelanto %}
                         {% if saldo > 0 and pedido.estado != 'Anulado' %}
-                        <div class="mt-3 pt-2 border-top">
-                            <label for="montoPago{{ pedido.id }}" class="form-label text-start d-block mb-1 fw-bold text-dark" style="font-size: 0.75rem;">
-                                Ingrese el monto a abonar (Max S/ {{ "%.2f"|format(saldo) }}):
+                        <div class="mt-3 pt-3 border-top">
+                            <label class="form-label text-start d-block mb-2 fw-bold text-dark" style="font-size: 0.85rem;">
+                                Opciones de pago rápido:
                             </label>
+                            
+                            <!-- Botones de selección rápida (Atajos) en color oscuro -->
+                            <div class="btn-group w-100 mb-2 shadow-sm" role="group">
+                                <button type="button" class="btn btn-outline-dark" 
+                                        onclick="document.getElementById('montoPago{{ pedido.id }}').value = '{{ '%.2f'|format(saldo / 2) }}'">
+                                    50% Adelanto<br><strong class="fs-6">S/ {{ "%.2f"|format(saldo / 2) }}</strong>
+                                </button>
+                                <button type="button" class="btn btn-outline-dark" 
+                                        onclick="document.getElementById('montoPago{{ pedido.id }}').value = '{{ '%.2f'|format(saldo) }}'">
+                                    Pagar Total<br><strong class="fs-6">S/ {{ "%.2f"|format(saldo) }}</strong>
+                                </button>
+                            </div>
+                    
+                            <label class="form-label text-start d-block mt-2 mb-1 text-muted" style="font-size: 0.75rem;">
+                                O ingresa un monto personalizado a abonar:
+                            </label>
+
+                            <!-- Input EDITABLE y botón de MercadoPago -->
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text bg-white fw-bold text-success">S/</span>
                                 <input type="number" 
@@ -79,24 +113,32 @@
                                        max="{{ '%.2f'|format(saldo) }}" 
                                        value="{{ '%.2f'|format(saldo) }}">
                                 <button onclick="pagarConMercadoPago('{{ pedido.id }}', this)" 
-                                        class="btn btn-sm text-white shadow-sm" 
+                                        class="btn btn-sm text-white shadow-sm px-3" 
                                         style="background-color: #009ee3; font-weight: 600;">
-                                    <i class="bi bi-credit-card"></i> Pagar Adelanto
+                                    <i class="bi bi-credit-card"></i> Pagar Ahora
                                 </button>
                             </div>
                         </div>
                         {% endif %}
                     </div>
                     
-                    <div class="text-muted small mb-3 d-flex justify-content-between align-items-center">
-                        <!-- Aplicación del filtro de Hora de Lima -->
-                        <span><i class="bi bi-calendar3"></i> {{ pedido.fecha|lima_time }}</span>
-                        {% set saldo = pedido.total_pagado - pedido.adelanto %}
-                        {% if saldo <= 0 %}
-                            <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-all"></i> Pagado al 100%</span>
-                        {% else %}
-                            <span class="badge bg-danger-subtle text-danger border border-danger"><i class="bi bi-exclamation-circle"></i> Saldo Pendiente</span>
-                        {% endif %}
+                    <div class="text-muted small mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <!-- Aplicación del filtro de Hora de Lima -->
+                            <span class="me-2"><i class="bi bi-calendar3"></i> {{ pedido.fecha|lima_time }}</span>
+                            
+                            {% set saldo = pedido.total_pagado - pedido.adelanto %}
+                            {% if saldo <= 0 %}
+                                <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-all"></i> Pagado al 100%</span>
+                            {% else %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger"><i class="bi bi-exclamation-circle"></i> Saldo Pendiente</span>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- BOTÓN DE COMPROBANTE -->
+                        <a href="/pedido/{{ pedido.id }}/comprobante" class="btn btn-sm btn-outline-secondary rounded-pill shadow-sm" target="_blank" title="Imprimir o descargar comprobante">
+                            <i class="bi bi-receipt"></i> Ver Comprobante
+                        </a>
                     </div>
 
                     <!-- Botón de chat y observaciones -->
@@ -220,5 +262,14 @@
             btnElement.disabled = false;
         });
     }
+</script>
+<script>
+function seleccionarMonto(pedidoId, monto) {
+    // Actualiza el input correspondiente con el monto seleccionado, formateado a 2 decimales
+    const inputMonto = document.getElementById('monto_input_' + pedidoId);
+    if(inputMonto) {
+        inputMonto.value = parseFloat(monto).toFixed(2);
+    }
+}
 </script>
 {% endblock %}
