@@ -67,11 +67,20 @@
 </div>
 
 <script>
-    // Asignar por defecto el día de hoy en el filtro de fechas
+    // Asignar por defecto el día de hoy en el filtro de fechas y bloquear fechas futuras
     document.addEventListener("DOMContentLoaded", function() {
         const hoy = new Date().toISOString().split('T')[0];
-        document.getElementById("fecha_inicio").value = hoy;
-        document.getElementById("fecha_fin").value = hoy;
+        
+        const fechaInicio = document.getElementById("fecha_inicio");
+        const fechaFin = document.getElementById("fecha_fin");
+        
+        // 1. Establecer el valor por defecto (como ya lo tenías)
+        fechaInicio.value = hoy;
+        fechaFin.value = hoy;
+        
+        // 2. Bloquear fechas futuras para que no se puedan seleccionar
+        fechaInicio.setAttribute('max', hoy);
+        fechaFin.setAttribute('max', hoy);
     });
 </script>
 {% endblock %}
