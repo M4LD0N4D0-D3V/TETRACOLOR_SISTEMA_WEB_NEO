@@ -1676,8 +1676,6 @@ def admin_dashboard():
         chart_estados_labels=chart_estados_labels,
         chart_estados_data=chart_estados_data
     )
-#########################
-
 # ==========================================
 # PASARELA DE PAGO CON ADELANTO DINÁMICO
 # ==========================================
@@ -1716,6 +1714,9 @@ def crear_preferencia_mp(pedido_id):
         if round(monto_a_pagar, 2) > saldo_pendiente:
             return jsonify({"error": f"El monto ingresado (S/ {monto_a_pagar:.2f}) no puede superar el saldo pendiente (S/ {saldo_pendiente:.2f})."}), 400
 
+        # Base URL dinámica (Detecta automáticamente si estás en Local, Codespaces o Render)
+        base_url = request.host_url.rstrip('/')
+
         preference_data = {
             "items": [
                 {
@@ -1726,9 +1727,9 @@ def crear_preferencia_mp(pedido_id):
                 }
             ],
             "back_urls": {
-                "success": f"https://shiny-parakeet-r75pr99gxx43wvx5-5000.app.github.dev/pago_mp_respuesta/exito/{pedido_id}",
-                "failure": f"https://shiny-parakeet-r75pr99gxx43wvx5-5000.app.github.dev/pago_mp_respuesta/fallo/{pedido_id}",
-                "pending": f"https://shiny-parakeet-r75pr99gxx43wvx5-5000.app.github.dev/pago_mp_respuesta/pendiente/{pedido_id}"
+                "success": f"{base_url}/pago_mp_respuesta/exito/{pedido_id}",
+                "failure": f"{base_url}/pago_mp_respuesta/fallo/{pedido_id}",
+                "pending": f"{base_url}/pago_mp_respuesta/pendiente/{pedido_id}"
             },
             "auto_return": "approved",
             "external_reference": str(pedido_id)
@@ -1750,16 +1751,15 @@ def crear_preferencia_mp(pedido_id):
         conn.close()
 
 
-@app.route('/pago_mp_respuesta/<estado>/<int:pedido_id>')
+@app.route('/pago_mp_respuesta/<string:estado>/<int:id_pedido>')
 @login_required
-def pago_mp_respuesta(estado, pedido_id):
+def pago_mp_respuesta(estado, id_pedido):
     payment_id = request.args.get('payment_id')
     
     if estado == 'exito' and payment_id:
         payment_info = sdk.payment().get(payment_id)
         
         if payment_info["status"] == 200 and payment_info["response"]["status"] == "approved":
-            # Extraer el monto exacto abonado a través de Mercado Pago
             monto_abonado = float(payment_info["response"]["transaction_amount"])
             
             conn = get_connection()
@@ -1771,7 +1771,7 @@ def pago_mp_respuesta(estado, pedido_id):
                         SELECT adelanto, total_pagado, 
                                (cantidad * (SELECT precio FROM producto WHERE id = id_producto)) AS costo_calc 
                         FROM pedido WHERE id = %s
-                    """, (pedido_id,))
+                    """, (id_pedido,))
                     ped = cursor.fetchone()
                     
                     costo_total = float(ped['total_pagado']) if float(ped['total_pagado']) > 0 else float(ped['costo_calc'])
@@ -1782,40 +1782,41 @@ def pago_mp_respuesta(estado, pedido_id):
                     mp_method = cursor.fetchone()
                     mp_id = mp_method['id'] if mp_method else None
                     
-                    # Guardar con la fecha exacta de Lima
+                    # Registrar abono con hora de Lima
                     cursor.execute("""
                         INSERT INTO historial_pagos (id_pedido, monto, id_metodo_pago, referencia_voucher, fecha)
                         VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')
-                    """, (pedido_id, monto_abonado, mp_id, f"MP-{payment_id}"))
+                    """, (id_pedido, monto_abonado, mp_id, f"MP-{payment_id}"))
                     
                     cursor.execute("""
                         UPDATE pedido SET adelanto = %s, total_pagado = %s WHERE id = %s
-                    """, (nuevo_adelanto, costo_total, pedido_id))
+                    """, (nuevo_adelanto, costo_total, id_pedido))
                     
                     conn.commit()
                     
                     saldo_restante = costo_total - nuevo_adelanto
                     if saldo_restante <= 0.01:
-                        flash(f"¡Pago completo procesado! El pedido #{pedido_id} fue cancelado al 100%.", "success")
+                        flash(f"¡Pago completo procesado! El pedido #{id_pedido} fue cancelado al 100%.", "success")
                     else:
                         flash(f"¡Adelanto de S/ {monto_abonado:.2f} registrado con éxito! Saldo restante: S/ {saldo_restante:.2f}", "success")
                 else:
                     flash("Este pago ya había sido procesado previamente.", "info")
             except Exception as e:
                 conn.rollback()
+                print(f"Error al registrar pago MP: {e}")
                 flash("Error al registrar el pago en la base de datos.", "warning")
             finally:
+                cursor.close()
                 conn.close()
         else:
             flash("El pago no fue aprobado por Mercado Pago.", "danger")
             
     elif estado == 'fallo':
-        flash(f"El proceso de pago del pedido #{pedido_id} fue cancelado o rechazado.", "danger")
+        flash(f"El proceso de pago del pedido #{id_pedido} fue cancelado o rechazado.", "danger")
     elif estado == 'pendiente':
-        flash(f"El abono para el pedido #{pedido_id} quedó en estado pendiente.", "warning")
+        flash(f"El abono para el pedido #{id_pedido} quedó en estado pendiente.", "warning")
         
     return redirect(url_for('mis_pedidos'))
-
 ############################################################################
 
 @app.route('/api/consultar')
